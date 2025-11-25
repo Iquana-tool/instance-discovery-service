@@ -1,0 +1,60 @@
+import os
+from contextlib import asynccontextmanager
+from logging import DEBUG
+from logging import getLogger
+
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.state import MODEL_CACHE, MODEL_REGISTRY
+from models.register_models import register_models
+
+# Router imports
+from app.routes import router as general_router
+from app.routes.models import api_router as models_router
+
+logger = getLogger(__name__)
+logger.setLevel(DEBUG)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup code
+    logger.debug("Starting up the Prompted Segmentation Service")
+    logger.debug("Registering models in the MODEL_REGISTRY")
+    register_models(MODEL_REGISTRY)
+    yield
+    # Shutdown code
+    logger.debug("Shutting down the Prompted Segmentation Service")
+
+
+def create_app():
+    logger.debug("Creating FastAPI application")
+    # Load environment variables
+    load_dotenv()
+
+    # Get allowed origins from environment variable
+    allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:8000").split(",")
+
+    app = FastAPI(
+        title="Completion Segmentation API",
+        lifespan=lifespan,
+        description="FastAPI backend for interactive completion segmentation",
+        version="0.1.0",
+    )
+
+    # Configure CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Include the routers
+    app.include_router(general_router)
+    app.include_router(models_router)
+
+    return app
