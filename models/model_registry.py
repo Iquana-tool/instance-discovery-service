@@ -28,7 +28,6 @@ class ModelInfo:
                  name: str,
                  description: str,
                  tags: list[str],
-                 supported_prompt_types: list[str] = ["point", "box"],
                  supports_refinement: bool = False):
         """Class to hold information about a segmentation model.
         :param identifier_str: Identifier string. Must be unique.
@@ -43,7 +42,6 @@ class ModelInfo:
         self.name = name
         self.description = description
         self.tags = tags
-        self.supported_prompt_types = supported_prompt_types
         self.supports_refinement = supports_refinement
 
     def to_json(self):
@@ -52,10 +50,7 @@ class ModelInfo:
             "identifier_str": self.identifier_str,
             "name": self.name,
             "description": self.description,
-            "weights_path": self.weights_path,
-            "configs_path": self.configs_path,
             "tags": self.tags,
-            "supported_prompt_types": self.supported_prompt_types,
             "supports_refinement": self.supports_refinement
         }
 
