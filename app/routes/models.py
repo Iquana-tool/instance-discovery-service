@@ -17,12 +17,12 @@ async def list_models():
         "available_models": available_models}
 
 
-@api_router.get("/load_model/{model_id}")
-async def load_model(model_id: str):
+@api_router.get("/load_model/model_id={model_id}&user_id={user_id}")
+async def load_model(model_id: int, user_id: int):
     """ Loads a model into the cache if not already loaded. This is a convenience endpoint; models are loaded
         automatically when needed, but this can be called at the start
         of an annotation session to preload the model."""
-    if MODEL_CACHE.check_if_loaded(model_id):
+    if MODEL_CACHE.check_if_loaded(user_id):
         return {
             "success": True,
             "message": f"Model {model_id} is already loaded in cache.",
@@ -31,11 +31,10 @@ async def load_model(model_id: str):
     else:
         try:
             model = MODEL_REGISTRY.load_model(model_id)
-            MODEL_CACHE.put(model_id, model)
+            MODEL_CACHE.put(user_id, model)
             return {
                 "success": True,
-                "message": f"Model {model_id} loaded successfully.",
-                "model_id": model_id
+                "message": f"Model {model_id} loaded successfully to cache.",
             }
         except Exception as e:
             logger.error(e)
