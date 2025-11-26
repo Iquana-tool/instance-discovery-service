@@ -15,7 +15,7 @@ async def infer_instances(request: Request):
                                                                           "first before running inference.")
     image = IMAGE_CACHE.get(request.user_id)
     if not request.user_id in MODEL_CACHE:
-        MODEL_CACHE.put(request.user_id, MODEL_REGISTRY.get_model_loader(request.model_key).load_model())
+        MODEL_CACHE.put(request.user_id, MODEL_REGISTRY.load_model(request.user_id))
     model: BaseModel = MODEL_CACHE.get(request.user_id)
     mask, score = model.process_request(image, request)
 
