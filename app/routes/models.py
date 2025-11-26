@@ -2,13 +2,13 @@ from logging import getLogger
 
 from fastapi import HTTPException
 
-from app.routes import router
+from app.routes import router, session_router
 from app.state import MODEL_REGISTRY, MODEL_CACHE
 
 logger = getLogger(__name__)
 
 
-@router.get("/available")
+@router.get("/get_available_models")
 async def list_models():
     """ Lists all available models in the registry. """
     available_models = MODEL_REGISTRY.list_models(only_return_available=True)
@@ -18,7 +18,7 @@ async def list_models():
         "available_models": available_models}
 
 
-@router.get("/load_model/model_id={model_id}&user_id={user_id}")
+@session_router.get("/load_model/model_key={model_id}&user_id={user_id}")
 async def load_model(model_id: int, user_id: int):
     """ Loads a model into the cache if not already loaded. This is a convenience endpoint; models are loaded
         automatically when needed, but this can be called at the start

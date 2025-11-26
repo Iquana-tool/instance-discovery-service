@@ -1,12 +1,12 @@
 from fastapi import status, HTTPException, Response
 
-from app.routes import router
+from app.routes import session_router
 from app.schemas.inference import Request
 from app.state import MODEL_CACHE, IMAGE_CACHE, MODEL_REGISTRY
 from models.base_models import BaseModel
 
 
-@router.post("/infer_instances")
+@session_router.post("/infer_instances")
 async def infer_instances(request: Request):
     """ Infer instances from seed instances. """
     if not request.user_id in IMAGE_CACHE:
