@@ -2,9 +2,13 @@ from logging import getLogger
 
 from fastapi import HTTPException
 
-from app.routes import router, session_router
-from app.state import MODEL_REGISTRY, MODEL_CACHE
 
+from app.state import MODEL_REGISTRY, MODEL_CACHE
+from fastapi import APIRouter
+
+
+router = APIRouter()
+session_router = APIRouter(prefix="/annotation_session", tags=["annotation_session"])
 logger = getLogger(__name__)
 
 

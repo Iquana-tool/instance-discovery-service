@@ -59,7 +59,8 @@ class DinoModel(Encoder):
         self.preprocess_std = preprocess_std
 
     def preprocess(self, image: Image.Image):
-        w, h = image.size
+        w = image.width
+        h = image.height
         h_patches = int(self.image_size / self.patch_size)
         w_patches = int((w * self.image_size) / (h * self.patch_size))
         tensor= TF.resize(
@@ -80,7 +81,7 @@ class DinoModel(Encoder):
                 dim = x.shape[0]
                 return x.view(dim, -1).permute(1, 0)
 
-    def embed_image(self, image: Image.Image, keep_dim=False) -> torch.Tensor:
+    def embed_image(self, image: Image.Image, keep_dim=True) -> torch.Tensor:
         og_h, og_w = image.height, image.width
         tensor, h_patches, w_patches = self.preprocess(image)
         flat_embedding = self.embed_preprocessed(tensor)
