@@ -1,8 +1,11 @@
 import cv2
-import torch
 import numpy as np
+import torch
 
-class CosineSimilarityPredictor:
+from models.predictors.predictor import SimilarityPredictor
+
+
+class CosineSimilarityPredictor(SimilarityPredictor):
     def __init__(self,
                  device: str = "cuda",
                  memory_aggregation: str = "mean",
@@ -31,7 +34,7 @@ class CosineSimilarityPredictor:
             return torch.empty((0, self.n_features), device=self.device)
         return torch.stack(self.example_vectors_list).half().to(self.device)
 
-    def reset_features(self):
+    def reset(self):
         self.example_vectors_list = []
 
     @property
@@ -77,21 +80,21 @@ class CosineSimilarityPredictor:
                 f"Example vector must have {self.n_features} features. You provided {example_vector.shape[0]} features."
         self.example_vectors_list.append(example_vector)
 
-    def add_example_vectors(self, example_vectors: torch.Tensor):
-        """Add multiple exemplar feature vectors to the predictor."""
-        if isinstance(example_vectors, np.ndarray):
-            example_vectors = torch.from_numpy(example_vectors).half().to(self.device)
+    def add_seed_instance(self, seed_instance: torch.Tensor):
+        """Add multiple exemplar feature vectors from one seed_instance to the predictor."""
+        if isinstance(seed_instance, np.ndarray):
+            seed_instance = torch.from_numpy(seed_instance).half().to(self.device)
         if self.memory_aggregation == "none":
-            for vec in example_vectors:
+            for vec in seed_instance:
                 self.add_example_vector(vec)
         elif self.memory_aggregation == "mean":
-            self.add_example_vector(example_vectors.mean(dim=0))
+            self.add_example_vector(seed_instance.mean(dim=0))
         elif self.memory_aggregation == "max":
-            self.add_example_vector(example_vectors.max(dim=0).values)
+            self.add_example_vector(seed_instance.max(dim=0).values)
         elif self.memory_aggregation == "min":
-            self.add_example_vector(example_vectors.min(dim=0).values)
+            self.add_example_vector(seed_instance.min(dim=0).values)
         elif self.memory_aggregation == "none":
-            for vec in example_vectors:
+            for vec in seed_instance:
                 self.add_example_vector(vec)
         else:
             raise NotImplementedError
@@ -100,7 +103,7 @@ class CosineSimilarityPredictor:
         """Predict if image embedding vectors are similar to any exemplar vector."""
         return self.get_flat_similarities(image_vectors) >= self.threshold
 
-    def predict_mask(self, image_embedding: torch.Tensor):
+    def predict(self, image_embedding: torch.Tensor):
         sim_map = self.get_similarity_map(image_embedding)
         return sim_map >= self.threshold
 

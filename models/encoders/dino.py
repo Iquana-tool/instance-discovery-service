@@ -4,7 +4,7 @@ from enum import Enum
 import torch
 import torchvision.transforms.functional as TF
 from PIL import Image
-
+from models.encoders.encoder import Encoder
 from paths import DINO_PATH
 
 
@@ -34,7 +34,7 @@ MODEL_TO_NUM_LAYERS = {
 }
 
 
-class DinoModel:
+class DinoModel(Encoder):
     REPO_DIR = "C:/Users/role01-admin/PycharmProjects/dinov3"
 
     def __init__(self,
@@ -80,13 +80,13 @@ class DinoModel:
                 dim = x.shape[0]
                 return x.view(dim, -1).permute(1, 0)
 
-    def embed_image(self, image: Image.Image, resize_to_original_size=False) -> torch.Tensor:
+    def embed_image(self, image: Image.Image, keep_dim=False) -> torch.Tensor:
         og_h, og_w = image.height, image.width
         tensor, h_patches, w_patches = self.preprocess(image)
         flat_embedding = self.embed_preprocessed(tensor)
         n_features = flat_embedding.shape[1]
         reshaped_embedding = flat_embedding.reshape(h_patches, w_patches, n_features)
-        if resize_to_original_size:
+        if keep_dim:
             reshaped_embedding = TF.resize(
                 reshaped_embedding.permute(2, 0, 1),
                 [og_h, og_w]
