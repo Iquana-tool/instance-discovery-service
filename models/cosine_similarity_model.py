@@ -7,7 +7,7 @@ from models.predictors.predictor import SimilarityPredictor
 
 
 class CosineSimilarityModel(BaseModel):
-    def __init__(self, predictor: SimilarityPredictor, backbone: Encoder):
+    def __init__(self, predictor: CosineSimilarityPredictor, backbone: Encoder):
         self.predictor = predictor
         self.backbone = backbone
 
@@ -19,7 +19,7 @@ class CosineSimilarityModel(BaseModel):
         for seed in request.seeds:
             self.predictor.add_seed_instance(embedded_img[seed])
         mask = self.predictor.predict(embedded_img)
-        return mask
+        return mask, self.predictor.threshold
 
 
 class Dino1000CosineHeMaxAgg(CosineSimilarityModel):

@@ -32,3 +32,6 @@ class ModelCache:
     def check_if_loaded(self, user_identifier):
         with self.lock:  # Acquire lock
             return user_identifier in self.cache
+
+    def __contains__(self, user_identifier):
+        with self.lock: return user_identifier in self.cache
