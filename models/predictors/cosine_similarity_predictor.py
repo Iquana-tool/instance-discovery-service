@@ -104,10 +104,8 @@ class CosineSimilarityPredictor(SimilarityPredictor):
         return self.get_flat_similarities(image_vectors) >= self.threshold
 
     def predict(self, image_embedding: torch.Tensor):
-        og_shape = image_embedding.shape
-        image_embedding = resize(image_embedding.permute([2, 0, 1]), size=1000).permute([1, 2, 0])
         sim_map = self.get_similarity_map(image_embedding)
-        return resize((sim_map >= self.threshold).unsqueeze(0).unsqueeze(0), [og_shape[0], og_shape[1]]).squeeze()
+        return sim_map >= self.threshold
 
     def get_flat_similarities(self, image_vectors: torch.Tensor):
         assert image_vectors.shape[-1] == self.n_features, \
