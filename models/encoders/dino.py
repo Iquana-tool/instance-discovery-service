@@ -5,7 +5,7 @@ import torch
 import torchvision.transforms.functional as TF
 from PIL import Image
 from models.encoders.encoder import Encoder
-from paths import DINO_PATH
+from paths import DINO_PATH, DINO_REPO_DIR
 
 
 class DinoModelType(Enum):
@@ -35,8 +35,6 @@ MODEL_TO_NUM_LAYERS = {
 
 
 class DinoModel(Encoder):
-    REPO_DIR = "C:/Users/role01-admin/PycharmProjects/dinov3"
-
     def __init__(self,
                  model_type: DinoModelType,
                  patch_size,
@@ -45,7 +43,7 @@ class DinoModel(Encoder):
                  preprocess_std=(0.229, 0.224, 0.225),
                  device='cuda'):
         self.model_type = model_type
-        self.model = torch.hub.load(self.REPO_DIR,
+        self.model = torch.hub.load(DINO_REPO_DIR,
                                     self.model_type.value,
                                     source='local',
                                     weights=os.path.join(DINO_PATH, MODEL_TO_WEIGHTS[model_type]))

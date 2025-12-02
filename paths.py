@@ -9,3 +9,4 @@ LOG_DIR = getenv("LOG_DIR", "logs")
 # Weights
 WEIGHTS = os.path.join(ROOT, "weights")
 DINO_PATH = os.path.join(WEIGHTS, "dino")
+DINO_REPO_DIR = getenv("DINO_REPO_DIR")
