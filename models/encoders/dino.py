@@ -1,12 +1,11 @@
-import os
 from enum import Enum
 
 import torch
 import torchvision.transforms.functional as TF
-from transformers import pipeline
 from PIL import Image
+from transformers import pipeline, AutoModel, AutoImageProcessor
+
 from models.encoders.encoder import Encoder
-from paths import DINO_PATH, DINO_REPO_DIR, HF_ACCESS_TOKEN
 
 
 class DinoModelType(Enum):
@@ -52,9 +51,12 @@ class DinoModel(Encoder):
                  preprocess_std=(0.229, 0.224, 0.225),
                  device='cuda'):
         self.model_type = model_type
-        self.model = pipeline(model=MODEL_TO_HF_URL[model_type],
-                              task='image-feature-extraction',
-                              device=device)
+        hf_url = MODEL_TO_HF_URL[model_type]
+        self.processor = AutoImageProcessor.from_pretrained(hf_url)
+        self.model = AutoModel.from_pretrained(
+            hf_url,
+            device_map="auto",
+        )
         self.device = device
         self.n_layers = MODEL_TO_NUM_LAYERS[model_type]
         self.patch_size = patch_size

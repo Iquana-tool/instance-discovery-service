@@ -42,6 +42,7 @@ async def load_model(model_id: str, user_id: str):
                 "message": f"Model {model_id} loaded successfully to cache.",
             }
         except Exception as e:
+            raise e
             logger.error(e)
             if type(e) == KeyError:
                 raise HTTPException(status_code=404, detail=f"Model {model_id} is not registered. Please check available models.")
