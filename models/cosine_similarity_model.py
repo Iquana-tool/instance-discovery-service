@@ -35,7 +35,7 @@ class Dino1000CosineHeMaxAgg(CosineSimilarityModel):
                 similarity_aggregation="mean",
                 similarity_redistribution_method="norm"),
             backbone=DinoModel(
-                model_type=DinoModelType.VITS16PLUS,
+                model_type=DinoModelType.VITS16,
                 patch_size=16,
                 image_size=1024,
             )

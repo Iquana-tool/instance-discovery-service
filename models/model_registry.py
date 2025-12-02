@@ -16,7 +16,7 @@ class ModelLoader:
 
     def is_loadable(self):
         # Implement logic to check if the model can be loaded with the given kwargs
-        return False
+        return True
 
     def load_model(self):
         return self.loader_function(**self.kwargs)

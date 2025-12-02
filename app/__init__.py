@@ -6,9 +6,10 @@ from logging import getLogger
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from huggingface_hub import login, logout, whoami
 from app.state import MODEL_CACHE, MODEL_REGISTRY
 from models.register_models import register_models
+from paths import HF_ACCESS_TOKEN
 
 # Router imports
 from app.routes import router as health_router
@@ -28,9 +29,16 @@ async def lifespan(app: FastAPI):
     # Startup code
     logger.debug("Starting up the Prompted Segmentation Service")
     logger.debug("Registering models in the MODEL_REGISTRY")
+    login(token=HF_ACCESS_TOKEN)
+    try:
+        user_info = whoami()
+        print("You are logged in as:", user_info["name"])
+    except Exception as e:
+        print("You are not logged in. Error:", e)
     register_models(MODEL_REGISTRY)
     yield
     # Shutdown code
+    logout()
     logger.debug("Shutting down the Prompted Segmentation Service")
 
 

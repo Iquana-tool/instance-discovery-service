@@ -23,7 +23,7 @@ async def list_models():
 
 
 @session_router.get("/load_model/model_key={model_id}&user_id={user_id}")
-async def load_model(model_id: int, user_id: int):
+async def load_model(model_id: str, user_id: str):
     """ Loads a model into the cache if not already loaded. This is a convenience endpoint; models are loaded
         automatically when needed, but this can be called at the start
         of an annotation session to preload the model."""

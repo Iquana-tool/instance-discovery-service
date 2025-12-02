@@ -3,9 +3,10 @@ from enum import Enum
 
 import torch
 import torchvision.transforms.functional as TF
+from transformers import pipeline
 from PIL import Image
 from models.encoders.encoder import Encoder
-from paths import DINO_PATH, DINO_REPO_DIR
+from paths import DINO_PATH, DINO_REPO_DIR, HF_ACCESS_TOKEN
 
 
 class DinoModelType(Enum):
@@ -23,6 +24,14 @@ MODEL_TO_WEIGHTS= {
     DinoModelType.VITL16: None,
     DinoModelType.VITH16PLUS: None,
     DinoModelType.VIT7B16: None,
+}
+MODEL_TO_HF_URL = {
+    DinoModelType.VITS16: "facebook/dinov3-vits16-pretrain-lvd1689m",
+    DinoModelType.VITS16PLUS: "facebook/dinov3-vits16plus-pretrain-lvd1689m",
+    DinoModelType.VITB16: "facebook/dinov3-vitb16-pretrain-lvd1689m",
+    DinoModelType.VITL16: "facebook/dinov3-vitl16-pretrain-lvd1689m",
+    DinoModelType.VITH16PLUS: "facebook/dinov3-vith16plus-pretrain-lvd1689m",
+    DinoModelType.VIT7B16: "facebook/dinov3-vit7b16-pretrain-lvd1689m",
 }
 MODEL_TO_NUM_LAYERS = {
     DinoModelType.VITS16: 12,
@@ -43,13 +52,10 @@ class DinoModel(Encoder):
                  preprocess_std=(0.229, 0.224, 0.225),
                  device='cuda'):
         self.model_type = model_type
-        self.model = torch.hub.load(DINO_REPO_DIR,
-                                    self.model_type.value,
-                                    source='local',
-                                    weights=os.path.join(DINO_PATH, MODEL_TO_WEIGHTS[model_type]))
+        self.model = pipeline(model=MODEL_TO_HF_URL[model_type],
+                              task='image-feature-extraction',
+                              device=device)
         self.device = device
-        self.model.to(device)
-        self.model.eval()
         self.n_layers = MODEL_TO_NUM_LAYERS[model_type]
         self.patch_size = patch_size
         self.image_size = image_size
@@ -71,10 +77,10 @@ class DinoModel(Encoder):
     def embed_preprocessed(self, tensor: torch.Tensor) -> torch.Tensor:
         with torch.inference_mode():
             with torch.autocast(device_type='cuda', dtype=torch.float32):
-                feats = self.model.get_intermediate_layers(tensor.unsqueeze(0).cuda(),
-                                                           n=range(self.n_layers),
-                                                           reshape=True,
-                                                      norm=True)
+                feats = self.model(tensor.unsqueeze(0).cuda(),
+                                   n=range(self.n_layers),
+                                   reshape=True,
+                                   norm=True)
                 x = feats[-1].squeeze().detach().cpu()
                 dim = x.shape[0]
                 return x.view(dim, -1).permute(1, 0)

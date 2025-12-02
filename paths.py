@@ -4,7 +4,7 @@ import os
 # General paths
 ROOT = os.path.dirname(os.path.realpath(__file__))
 LOG_DIR = getenv("LOG_DIR", "logs")
-
+HF_ACCESS_TOKEN = getenv("HF_ACCESS_TOKEN")
 
 # Weights
 WEIGHTS = os.path.join(ROOT, "weights")
