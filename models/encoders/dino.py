@@ -69,11 +69,7 @@ class DinoModel(Encoder):
         h = image.height
         h_patches = int(self.image_size / self.patch_size)
         w_patches = int((w * self.image_size) / (h * self.patch_size))
-        tensor= TF.resize(
-                TF.to_tensor(image),
-                [h_patches * self.patch_size, w_patches * self.patch_size]
-            )
-        tensor = TF.normalize(tensor, mean=self.preprocess_mean, std=self.preprocess_std)
+        tensor = self.processor(image=image, return_tensors="pt")
         return tensor, h_patches, w_patches
 
     def embed_preprocessed(self, tensor: torch.Tensor) -> torch.Tensor:
