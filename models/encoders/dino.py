@@ -52,10 +52,10 @@ class DinoModel(Encoder):
                  device='cuda'):
         self.model_type = model_type
         hf_url = MODEL_TO_HF_URL[model_type]
-        self.processor = AutoImageProcessor.from_pretrained(hf_url)
+        self.processor = AutoImageProcessor.from_pretrained(hf_url, device_map=device)
         self.model = AutoModel.from_pretrained(
             hf_url,
-            device_map="auto",
+            device_map=device,
         )
         self.device = device
         self.n_layers = MODEL_TO_NUM_LAYERS[model_type]
@@ -74,21 +74,22 @@ class DinoModel(Encoder):
 
     def embed_preprocessed(self, input) -> torch.Tensor:
         with torch.inference_mode():
-            with torch.autocast(device_type='cuda', dtype=torch.float32):
+            with torch.autocast(device_type=self.device, dtype=torch.float32):
                 feats = self.model(**input)
                 x = feats[-1].squeeze().detach().cpu()
                 dim = x.shape[0]
                 return x.view(dim, -1).permute(1, 0)
 
     def embed_image(self, image: Image.Image, keep_dim=True) -> torch.Tensor:
-        og_h, og_w = image.height, image.width
-        input = self.processor(image, return_tensors="pt")
         with torch.inference_mode():
-            outputs = self.model(**input)
-        print(outputs)
-        if keep_dim:
-            reshaped_embedding = TF.resize(
-                outputs.permute(2, 0, 1),
-                [og_h, og_w]
-            ).permute(1, 2, 0)
-        return reshaped_embedding
+            with torch.autocast(device_type=self.device, dtype=torch.float32):
+                og_h, og_w = image.height, image.width
+                input = self.processor(image, return_tensors="pt")
+                outputs = self.model(**input)
+                print(outputs)
+                if keep_dim:
+                    outputs = TF.resize(
+                        outputs.permute(2, 0, 1),
+                        [og_h, og_w]
+                    ).permute(1, 2, 0)
+                return outputs
