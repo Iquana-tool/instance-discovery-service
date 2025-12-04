@@ -72,26 +72,23 @@ class DinoModel(Encoder):
         tensor = self.processor(image=image, return_tensors="pt")
         return tensor, h_patches, w_patches
 
-    def embed_preprocessed(self, tensor: torch.Tensor) -> torch.Tensor:
+    def embed_preprocessed(self, input) -> torch.Tensor:
         with torch.inference_mode():
             with torch.autocast(device_type='cuda', dtype=torch.float32):
-                feats = self.model(tensor.unsqueeze(0).cuda(),
-                                   n=range(self.n_layers),
-                                   reshape=True,
-                                   norm=True)
+                feats = self.model(**input)
                 x = feats[-1].squeeze().detach().cpu()
                 dim = x.shape[0]
                 return x.view(dim, -1).permute(1, 0)
 
     def embed_image(self, image: Image.Image, keep_dim=True) -> torch.Tensor:
         og_h, og_w = image.height, image.width
-        tensor, h_patches, w_patches = self.preprocess(image)
-        flat_embedding = self.embed_preprocessed(tensor)
-        n_features = flat_embedding.shape[1]
-        reshaped_embedding = flat_embedding.reshape(h_patches, w_patches, n_features)
+        input = self.processor(image, return_tensors="pt")
+        with torch.inference_mode():
+            outputs = self.model(**input)
+        print(outputs)
         if keep_dim:
             reshaped_embedding = TF.resize(
-                reshaped_embedding.permute(2, 0, 1),
+                outputs.permute(2, 0, 1),
                 [og_h, og_w]
             ).permute(1, 2, 0)
         return reshaped_embedding
