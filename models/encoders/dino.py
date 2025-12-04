@@ -49,7 +49,7 @@ class DinoModel(Encoder):
                  image_size,
                  preprocess_mean=(0.485, 0.456, 0.406),
                  preprocess_std=(0.229, 0.224, 0.225),
-                 device='cuda'):
+                 device='auto'):
         self.model_type = model_type
         hf_url = MODEL_TO_HF_URL[model_type]
         self.processor = AutoImageProcessor.from_pretrained(hf_url, device_map=device)
@@ -57,7 +57,7 @@ class DinoModel(Encoder):
             hf_url,
             device_map=device,
         )
-        self.device = device
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.n_layers = MODEL_TO_NUM_LAYERS[model_type]
         self.patch_size = patch_size
         self.image_size = image_size
