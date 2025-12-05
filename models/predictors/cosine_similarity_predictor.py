@@ -13,7 +13,7 @@ class CosineSimilarityPredictor(SimilarityPredictor):
                  similarity_redistribution_method: str = "none"):
         self.example_vectors_list = []
         self.n_features = None
-        self.device = device
+        self.device = ('cuda' if torch.cuda.is_available() else 'cpu') if device == 'auto' else device
         self.similarity_aggregation = similarity_aggregation
         self.memory_aggregation = memory_aggregation
         self.similarity_redistribution_method = similarity_redistribution_method
@@ -55,6 +55,7 @@ class CosineSimilarityPredictor(SimilarityPredictor):
         if normalize:
             mat_1 = torch.nn.functional.normalize(mat_1, dim=1)
             mat_2 = torch.nn.functional.normalize(mat_2, dim=1)
+        print(f"Computing cosine similarity between m1 ({mat_1.shape}) and m2 ({mat_2.shape})")
         # Compute cosine similarities
         return torch.mm(mat_1, mat_2.T)
 
@@ -83,7 +84,7 @@ class CosineSimilarityPredictor(SimilarityPredictor):
     def add_seed_instance(self, seed_instance: torch.Tensor):
         """Add multiple exemplar feature vectors from one seed_instance to the predictor."""
         if isinstance(seed_instance, np.ndarray):
-            seed_instance = torch.from_numpy(seed_instance).half().to(self.device)
+            seed_instance = torch.from_numpy(seed_instance)
         if self.memory_aggregation == "none":
             for vec in seed_instance:
                 self.add_example_vector(vec)
@@ -104,8 +105,9 @@ class CosineSimilarityPredictor(SimilarityPredictor):
         return self.get_flat_similarities(image_vectors) >= self.threshold
 
     def predict(self, image_embedding: torch.Tensor):
-        sim_map = self.get_similarity_map(image_embedding)
-        return sim_map >= self.threshold
+        with torch.autocast(device_type=self.device, dtype=torch.float16):
+            sim_map = self.get_similarity_map(image_embedding)
+            return sim_map >= self.threshold
 
     def get_flat_similarities(self, image_vectors: torch.Tensor):
         assert image_vectors.shape[-1] == self.n_features, \
@@ -117,13 +119,14 @@ class CosineSimilarityPredictor(SimilarityPredictor):
         return self.aggregate_similarities(cosine_similarities)
 
     def get_similarity_map(self, image_embedding: torch.Tensor):
+        print("Computing similarity map...")
         if isinstance(image_embedding, np.ndarray):
             image_embedding = torch.from_numpy(image_embedding)
-        image_embedding = image_embedding.half().to(self.device)
         og_shape = image_embedding.shape
         image_embedding_vectors = image_embedding.reshape(-1, self.n_features)
         flat_map = self.get_flat_similarities(image_embedding_vectors)
-        return self.redistribute_similarities((flat_map.reshape(og_shape[:-1]) + 1) / 2)
+        print("Computed similarities")
+        return self.redistribute_similarities(flat_map.reshape(og_shape[:-1]))
 
     def redistribute_similarities(self, sim_map: torch.Tensor):
         if self.similarity_redistribution_method == "none":

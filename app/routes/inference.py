@@ -1,3 +1,4 @@
+import numpy as np
 from fastapi import status, HTTPException, Response
 
 from app.schemas.inference import Request

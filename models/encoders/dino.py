@@ -52,12 +52,12 @@ class DinoModel(Encoder):
                  device='auto'):
         self.model_type = model_type
         hf_url = MODEL_TO_HF_URL[model_type]
-        self.processor = AutoImageProcessor.from_pretrained(hf_url, device_map=device)
-        self.model = AutoModel.from_pretrained(
-            hf_url,
-            device_map=device,
+        self.device = ('cuda' if torch.cuda.is_available() else 'cpu') if device == 'auto' else device
+        self.model = pipeline(
+            model=hf_url,
+            task="image-feature-extraction",
+            device=self.device,
         )
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.n_layers = MODEL_TO_NUM_LAYERS[model_type]
         self.patch_size = patch_size
         self.image_size = image_size
@@ -82,11 +82,10 @@ class DinoModel(Encoder):
 
     def embed_image(self, image: Image.Image, keep_dim=True) -> torch.Tensor:
         with torch.inference_mode():
-            with torch.autocast(device_type=self.device, dtype=torch.float32):
+            with torch.autocast(device_type=self.device, dtype=torch.float16):
                 og_h, og_w = image.height, image.width
-                input = self.processor(image, return_tensors="pt")
-                outputs = self.model(**input)
-                print(outputs)
+                # input = self.processor(image, return_tensors="pt")
+                outputs = self.model(image, return_tensors="pt")
                 if keep_dim:
                     outputs = TF.resize(
                         outputs.permute(2, 0, 1),
