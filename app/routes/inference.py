@@ -21,20 +21,11 @@ async def infer_instances(request: Request):
     if not request.user_id in MODEL_CACHE:
         MODEL_CACHE.put(request.user_id, MODEL_REGISTRY.load_model(request.model_key))
     model: BaseModel = MODEL_CACHE.get(request.user_id)
-    mask, score = model.process_request(image, request)
-
-    # Convert the mask to raw bytes
-    mask_bytes = mask.tobytes()
-
-    # Return the raw bytes with metadata in headers
-    return Response(
-        content=mask_bytes,
-        media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": "attachment; filename=mask.bin",
-            "X-Mask-Shape": f"{mask.shape[0]},{mask.shape[1]}",  # e.g., "256,256"
-            "X-Mask-Dtype": str(mask.dtype),  # e.g., "uint8"
-            "X-Score": str(score)  # Optional: Include the score
-        }
-    )
+    boxes, scores = model.process_request(image, request)
+    print(boxes, scores)
+    return {
+        "success": True,
+        "message": f"Found {len(boxes)} keypoints for user {request.user_id}",
+        "boxes": boxes,
+    }
 

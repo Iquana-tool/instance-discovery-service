@@ -1,11 +1,12 @@
 from typing import Union
 
+import cv2
 import numpy as np
-from PIL.Image import fromarray, Image
-from torch import Tensor
+import torch
 import plotly.express as px
-import plotly.graph_objects as go
-from app.schemas.inference import Request
+from PIL.Image import Image, fromarray
+from torchvision.ops import batched_nms
+
 from models.base_models import BaseModel
 from models.encoders.dino import DinoModel, DinoModelType
 from models.encoders.encoder import Encoder
@@ -24,30 +25,101 @@ class CosineSimilarityModel(BaseModel):
         else:
             self.max_image_size = max_image_size
 
-    def process_request(self, image, request: Request):
+    def process_request(self, image, request):
+        # 1. Preprocess image
         if isinstance(image, np.ndarray):
             image = fromarray(image)
         image = image.resize(self.max_image_size)
         print("Embedding image!")
-        embedded_img: Tensor = self.backbone.embed_image(image=image)
+        embedded_img = self.backbone.embed_image(image=image)
         print(f"Embedded image shape: {embedded_img.shape}")
-        self.predictor.reset()
+
+        # 2. Combine all seed masks into a single binary mask
+        combined_seed_mask = np.zeros(self.max_image_size, dtype=np.bool)
+        min_area, max_area = 1, 0
+        for seed in request.seeds:
+            seed_mask = np.array(seed, dtype=np.bool)
+            min_area = min(min_area, np.count_nonzero(seed_mask) / seed_mask.size)
+            max_area = max(max_area, np.count_nonzero(seed_mask) / seed_mask.size)
+            seed_mask = np.array(fromarray(seed_mask).resize(self.max_image_size))
+            combined_seed_mask = np.logical_or(combined_seed_mask, seed_mask)
+
+        min_area = max(0, min_area * 0.8)
+        max_area = min(1, max_area * 1.2)
+
+        # 3. Process seeds separately and average similarity maps
+        sim_maps = []
         for seed in request.seeds:
             seed_mask = np.array(seed, dtype=np.bool)
             seed_mask = np.array(fromarray(seed_mask).resize(self.max_image_size))
+            self.predictor.reset()
             self.predictor.add_seed_instance(embedded_img[seed_mask])
-        print("Computing cosine similarity...")
-        mask = self.predictor.predict(embedded_img)
-        print(f"Returning thresholded map. Mask shape: {mask.shape}")
-        fig = px.imshow(mask * 255)
-        fig.show()
-        return mask.cpu().numpy(),  self.predictor.threshold
+            sim_map = self.predictor.get_similarity_map(embedded_img)
+            px.imshow(sim_map).show()
+            sim_maps.append(sim_map)
+        final_sim_map = torch.mean(torch.stack(sim_maps), dim=0).cpu().numpy()
+        final_sim_map = (final_sim_map * 255).astype(np.uint8)
+        print("Computed averaged similarity map.")
+
+        # 4. Adaptive thresholding
+        _, thresholded = cv2.threshold(final_sim_map, 230, 255, cv2.THRESH_BINARY)
+        px.imshow(thresholded).show()
+        print("Applied adaptive thresholding.")
+
+        # 5. Connected component analysis for bounding boxes
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(thresholded, connectivity=8)
+        boxes = []
+        for i in range(1, num_labels):
+            x, y, w, h, _ = stats[i]
+            boxes.append([x, y, x + w, y + h])  # [x1, y1, x2, y2] format
+
+        # 6. Non-Maximum Suppression (NMS)
+        if boxes:
+            boxes = torch.tensor(boxes, dtype=torch.float32)
+            areas = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+            keep = batched_nms(boxes, areas, torch.zeros(len(boxes)), iou_threshold=0.5)
+            final_boxes = boxes[keep].numpy()
+        else:
+            final_boxes = np.array([])
+
+        # 7. Remove boxes overlapping with seeds
+        filtered_boxes = []
+        for box in final_boxes:
+            x1, y1, x2, y2 = map(int, box)
+            # Create a mask for the current box
+            box_mask = np.zeros_like(combined_seed_mask, dtype=np.bool)
+            box_mask[y1:y2, x1:x2] = True
+            # Calculate overlap with seeds
+            overlap = np.logical_and(box_mask, combined_seed_mask)
+            overlap_area = np.sum(overlap)
+            box_area = (x2 - x1) * (y2 - y1)
+            # Only keep boxes with minimal overlap (e.g., < 20% of box area) and inside a certain area range
+            if overlap_area / box_area < 0.2:
+                filtered_boxes.append(box)
+
+        # 8. Normalize box coordinates
+        h, w = final_sim_map.shape
+        normalized_boxes = []
+        for box in filtered_boxes:
+            x1, y1, x2, y2 = box
+            norm_x1 = float(x1 / w)
+            norm_y1 = float(y1 / h)
+            norm_x2 = float(x2 / w)
+            norm_y2 = float(y2 / h)
+            norm_box_area = (norm_x2 - norm_x1) * (norm_y2 - norm_y1)
+            if min_area <= norm_box_area <= max_area:
+                normalized_boxes.append([
+                    norm_x1, norm_y1, norm_x2, norm_y2,
+                ])
+
+        print(f"Detected {len(normalized_boxes)} objects after filtering seed overlaps.")
+        return normalized_boxes, []
 
 
 class Dino1000CosineHeMaxAgg(CosineSimilarityModel):
     def __init__(self):
         super().__init__(
-            max_image_size=256,
+            max_image_size=512,
             predictor=CosineSimilarityPredictor(
                 device="auto",
                 memory_aggregation="none",
@@ -55,8 +127,8 @@ class Dino1000CosineHeMaxAgg(CosineSimilarityModel):
                 similarity_redistribution_method="norm"),
             backbone=DinoModel(
                 device="auto",
-                model_type=DinoModelType.VITS16PLUS,
+                model_type=DinoModelType.VITL16,
                 patch_size=16,
-                image_size=256,
+                image_size=1024,
             )
         )

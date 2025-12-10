@@ -1,9 +1,13 @@
 from enum import Enum
 
+import numpy as np
 import torch
 import torchvision.transforms.functional as TF
 from PIL import Image
-from transformers import pipeline, AutoModel, AutoImageProcessor
+from transformers import pipeline, AutoModel, AutoImageProcessor,DINOv3ViTModel, DINOv3ViTConfig, DINOv3ViTImageProcessorFast
+from sklearn.decomposition import PCA
+import plotly.express as px
+from transformers.image_utils import SizeDict
 
 from models.encoders.encoder import Encoder
 
@@ -45,31 +49,47 @@ MODEL_TO_NUM_LAYERS = {
 class DinoModel(Encoder):
     def __init__(self,
                  model_type: DinoModelType,
-                 patch_size,
-                 image_size,
+                 patch_size=None,
+                 image_size=None,
                  preprocess_mean=(0.485, 0.456, 0.406),
                  preprocess_std=(0.229, 0.224, 0.225),
                  device='auto'):
         self.model_type = model_type
         hf_url = MODEL_TO_HF_URL[model_type]
         self.device = ('cuda' if torch.cuda.is_available() else 'cpu') if device == 'auto' else device
-        self.model = pipeline(
-            model=hf_url,
-            task="image-feature-extraction",
-            device=self.device,
-        )
+
         self.n_layers = MODEL_TO_NUM_LAYERS[model_type]
         self.patch_size = patch_size
         self.image_size = image_size
         self.preprocess_mean = preprocess_mean
         self.preprocess_std = preprocess_std
 
+        self.processor: DINOv3ViTImageProcessorFast = AutoImageProcessor.from_pretrained(
+            hf_url,
+            device=self.device)
+        self.config = DINOv3ViTConfig.from_pretrained(hf_url, device=self.device)
+        if self.patch_size is not None:
+            self.config.patch_size = self.patch_size
+        else:
+            self.patch_size = self.config.patch_size
+        if self.image_size is not None:
+            self.config.image_size = self.image_size
+        else:
+            self.image_size = self.config.image_size
+        self.model = DINOv3ViTModel(
+            config=self.config
+        )
+        self.model.to(self.device)
+
     def preprocess(self, image: Image.Image):
         w = image.width
         h = image.height
         h_patches = int(self.image_size / self.patch_size)
         w_patches = int((w * self.image_size) / (h * self.patch_size))
-        tensor = self.processor(image=image, return_tensors="pt")
+        tensor = self.processor(
+            images=image,
+            size=self.image_size,
+            return_tensors="pt")
         return tensor, h_patches, w_patches
 
     def embed_preprocessed(self, input) -> torch.Tensor:
@@ -80,15 +100,37 @@ class DinoModel(Encoder):
                 dim = x.shape[0]
                 return x.view(dim, -1).permute(1, 0)
 
-    def embed_image(self, image: Image.Image, keep_dim=True) -> torch.Tensor:
+    def embed_image(self, image: Image.Image, keep_dim=True, debug_pca=False) -> torch.Tensor:
         with torch.inference_mode():
-            with torch.autocast(device_type=self.device, dtype=torch.float16):
+            with torch.autocast(device_type=self.device, dtype=torch.float32):
+                # Save the original size
                 og_h, og_w = image.height, image.width
-                # input = self.processor(image, return_tensors="pt")
-                outputs = self.model(image, return_tensors="pt")
+
+                # Preprocess the image
+                inputs, h_patches, w_patches = self.preprocess(image)
+                print(h_patches, w_patches)
+
+                # Compute the embedding
+                with torch.inference_mode():
+                    outputs = self.model.forward(**inputs, output_hidden_states=False)
+
+                # We only need the last hidden state
+                last_hidden_state = outputs.last_hidden_state.squeeze()
+                cls_token, reg_token, embeddings = last_hidden_state[0], last_hidden_state[1:5], last_hidden_state[5:]
+                embeddings = embeddings.reshape(h_patches, w_patches, -1)
+
+                # Resize to original size if enabled
                 if keep_dim:
-                    outputs = TF.resize(
-                        outputs.permute(2, 0, 1),
+                    embeddings = TF.resize(
+                        embeddings.permute(2, 0, 1),
                         [og_h, og_w]
                     ).permute(1, 2, 0)
-                return outputs
+
+                # Visualizing the PCA here for debugging
+                if debug_pca:
+                    pca = PCA(n_components=3, whiten=True)
+                    output_cpu = embeddings.flatten(end_dim=1).cpu().numpy()
+                    projection = pca.fit_transform(output_cpu).reshape(og_h, og_w, 3)
+                    projection = (projection - projection.min()) / (projection.max() - projection.min())
+                    px.imshow(projection).show()
+                return embeddings
