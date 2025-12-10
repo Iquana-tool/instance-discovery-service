@@ -2,8 +2,9 @@ import numpy as np
 import torch
 from transformers.models.sam3 import Sam3Model, Sam3Processor
 
-from app.schemas.inference import Request
+from app.schemas.inference import Request, InstanceMasksResponse
 from models.base_models import BaseModel
+from util.postprocess import filter_seed_masks
 
 
 class SAM3Completion(BaseModel):
@@ -15,7 +16,7 @@ class SAM3Completion(BaseModel):
         self.model = Sam3Model.from_pretrained("facebook/sam3").to(self.device)
         self.threshold = threshold
 
-    def process_request(self, image, request: Request) -> tuple[np.ndarray, float]:
+    def process_request(self, image, request: Request) -> InstanceMasksResponse:
         # Extract the prompts from the given instance masks
         bboxes = []
         for seed in request.seeds:
@@ -48,16 +49,12 @@ class SAM3Completion(BaseModel):
         )[0]
 
         print(f"Found {len(results['masks'])} objects")
-        bboxes: np.ndarray = results['boxes'].cpu().numpy()
-        scores: np.ndarray = results['scores'].cpu().numpy()
-
-        for bbox in bboxes:
-            sizes = inputs.get("original_sizes").tolist()
-            print(sizes)
-            bbox[0] = bbox[0] / sizes[0][1]
-            bbox[1] = bbox[1] / sizes[0][0]
-            bbox[2] = bbox[2] / sizes[0][1]
-            bbox[3] = bbox[3] / sizes[0][0]
-        return bboxes.tolist(), scores.tolist()
+        masks = results["masks"].cpu().numpy()
+        scores = results["scores"].cpu().numpy()
+        keep_ids = filter_seed_masks(request.get_combined_seed_mask(inputs.get("original_sizes").tolist()[0]), masks)
+        return InstanceMasksResponse(
+            masks=masks[keep_ids].tolist(),
+            scores=scores[keep_ids].tolist(),
+        )
 
 

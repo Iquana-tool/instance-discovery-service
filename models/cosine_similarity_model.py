@@ -7,10 +7,12 @@ import plotly.express as px
 from PIL.Image import Image, fromarray
 from torchvision.ops import batched_nms
 
+from app.schemas.inference import BBoxesResponse
 from models.base_models import BaseModel
 from models.encoders.dino import DinoModel, DinoModelType
 from models.encoders.encoder import Encoder
 from models.predictors.cosine_similarity_predictor import CosineSimilarityPredictor
+from util.postprocess import filter_seed_bboxes
 
 
 class CosineSimilarityModel(BaseModel):
@@ -35,17 +37,10 @@ class CosineSimilarityModel(BaseModel):
         print(f"Embedded image shape: {embedded_img.shape}")
 
         # 2. Combine all seed masks into a single binary mask
-        combined_seed_mask = np.zeros(self.max_image_size, dtype=np.bool)
-        min_area, max_area = 1, 0
-        for seed in request.seeds:
-            seed_mask = np.array(seed, dtype=np.bool)
-            min_area = min(min_area, np.count_nonzero(seed_mask) / seed_mask.size)
-            max_area = max(max_area, np.count_nonzero(seed_mask) / seed_mask.size)
-            seed_mask = np.array(fromarray(seed_mask).resize(self.max_image_size))
-            combined_seed_mask = np.logical_or(combined_seed_mask, seed_mask)
-
-        min_area = max(0, min_area * 0.8)
-        max_area = min(1, max_area * 1.2)
+        combined_seed_mask = request.get_combined_seed_mask(self.max_image_size)
+        min_area, max_area = request.min_max_area
+        min_area = max(0., min_area * 0.8)
+        max_area = min(1., max_area * 1.2)
 
         # 3. Process seeds separately and average similarity maps
         sim_maps = []
@@ -83,25 +78,16 @@ class CosineSimilarityModel(BaseModel):
             final_boxes = np.array([])
 
         # 7. Remove boxes overlapping with seeds
-        filtered_boxes = []
-        for box in final_boxes:
-            x1, y1, x2, y2 = map(int, box)
-            # Create a mask for the current box
-            box_mask = np.zeros_like(combined_seed_mask, dtype=np.bool)
-            box_mask[y1:y2, x1:x2] = True
-            # Calculate overlap with seeds
-            overlap = np.logical_and(box_mask, combined_seed_mask)
-            overlap_area = np.sum(overlap)
-            box_area = (x2 - x1) * (y2 - y1)
-            # Only keep boxes with minimal overlap (e.g., < 20% of box area) and inside a certain area range
-            if overlap_area / box_area < 0.2:
-                filtered_boxes.append(box)
+        keep_idx = filter_seed_bboxes(combined_seed_mask, final_boxes)
+        filtered_boxes = final_boxes[keep_idx]
 
         # 8. Normalize box coordinates
         h, w = final_sim_map.shape
         normalized_boxes = []
+        scores = []
         for box in filtered_boxes:
             x1, y1, x2, y2 = box
+            scores.append(np.average(final_sim_map[y1:y2, x1:x2]).item())
             norm_x1 = float(x1 / w)
             norm_y1 = float(y1 / h)
             norm_x2 = float(x2 / w)
@@ -113,7 +99,10 @@ class CosineSimilarityModel(BaseModel):
                 ])
 
         print(f"Detected {len(normalized_boxes)} objects after filtering seed overlaps.")
-        return normalized_boxes, []
+        return BBoxesResponse(
+            bboxes=normalized_boxes,
+            scores=scores
+        )
 
 
 class Dino1000CosineHeMaxAgg(CosineSimilarityModel):

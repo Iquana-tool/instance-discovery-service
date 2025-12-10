@@ -21,11 +21,10 @@ async def infer_instances(request: Request):
     if not request.user_id in MODEL_CACHE:
         MODEL_CACHE.put(request.user_id, MODEL_REGISTRY.load_model(request.model_key))
     model: BaseModel = MODEL_CACHE.get(request.user_id)
-    boxes, scores = model.process_request(image, request)
-    print(boxes, scores)
+    response = model.process_request(image, request)
     return {
         "success": True,
-        "message": f"Found {len(boxes)} keypoints for user {request.user_id}",
-        "boxes": boxes,
+        "message": f"Detected {response.n_objects} objects for user {request.user_id}",
+        "response": response.model_dump(),
     }
 
