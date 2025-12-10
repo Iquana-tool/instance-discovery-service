@@ -1,13 +1,11 @@
 from enum import Enum
 
-import numpy as np
+import plotly.express as px
 import torch
 import torchvision.transforms.functional as TF
 from PIL import Image
-from transformers import pipeline, AutoModel, AutoImageProcessor,DINOv3ViTModel, DINOv3ViTConfig, DINOv3ViTImageProcessorFast
 from sklearn.decomposition import PCA
-import plotly.express as px
-from transformers.image_utils import SizeDict
+from transformers import AutoImageProcessor, DINOv3ViTModel, DINOv3ViTConfig, DINOv3ViTImageProcessorFast
 
 from models.encoders.encoder import Encoder
 
