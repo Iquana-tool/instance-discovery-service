@@ -1,0 +1,3 @@
+[submodule "models/geco"]
+	path = models/geco
+	url = https://github.com/jerpelhan/GeCo.git
