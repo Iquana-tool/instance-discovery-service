@@ -1,4 +1,5 @@
 from models.cosine_similarity_model import Dino1000CosineHeMaxAgg
+from models.geco_model import GeCoCompletion
 from models.model_registry import ModelRegistry, ModelInfo, ModelLoader
 from models.sam3 import SAM3Completion
 from paths import *
@@ -38,5 +39,19 @@ def register_models(model_registry: ModelRegistry):
             loader_function=SAM3Completion,
             threshold=0.5,
 
+        )
+    )
+    model_registry.register_model(
+        ModelInfo(
+            identifier_str='geco',
+            name="GeCo",
+            description="GeCo, a novel low-shot counter that achieves accurate object detection, segmentation, and "
+                        "count estimation in a unified architecture. GeCo robustly generalizes the prototypes across "
+                        "objects appearances through a novel dense object query formulation.",
+            tags=["SOTA"],
+            supports_refinement=False,
+        ),
+        ModelLoader(
+            loader_function=GeCoCompletion,
         )
     )

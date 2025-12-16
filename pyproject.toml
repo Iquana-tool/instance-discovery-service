@@ -16,7 +16,9 @@ dependencies = [
     "scikit-learn>=1.7.2",
     "torch>=2.9.1",
     "torchvision>=0.24.1",
+    "transformers",
 ]
 
 [tool.uv.sources]
+transformers = { git = "https://github.com/huggingface/transformers.git" }
 geco = { git = "https://github.com/robertleist/GeCo.git" }

@@ -1,6 +1,8 @@
-from typing import Any
+from typing import Any, Literal, LiteralString
 
+import cv2
 import numpy as np
+import torch
 from PIL.Image import fromarray
 from pydantic import BaseModel, Field
 
@@ -30,6 +32,41 @@ class Request(BaseModel):
             min_area = min(min_area, np.count_nonzero(seed_mask) / seed_mask.size)
             max_area = max(max_area, np.count_nonzero(seed_mask) / seed_mask.size)
         return min_area, max_area
+
+    def get_bboxes(self,
+                   format: Literal["xywh", "x1y1x2y2"] = "x1y1x2y2",
+                   return_tensors: bool = True,
+                   device: Literal["cpu", "cuda"] | None = None,
+                   relative_coordinates: bool = True,
+                   resize_to: None | tuple[int, int] = None) \
+            -> list[list[float]] | torch.Tensor:
+        bboxes = []
+        for seed in self.seeds:
+            seed_mask = np.array(seed, dtype=np.bool)
+            if resize_to:
+                seed_mask = cv2.resize(seed_mask.astype(np.uint8), resize_to)
+            indices = np.argwhere(seed_mask.astype(bool))
+            x_min = np.min(indices[1]).item()
+            y_min = np.min(indices[0]).item()
+            x_max = np.max(indices[1]).item()
+            y_max = np.max(indices[0]).item()
+            if relative_coordinates:
+                x_min /= seed_mask.shape[1]
+                y_min /= seed_mask.shape[0]
+                x_max /= seed_mask.shape[1]
+                y_max /= seed_mask.shape[0]
+            if format == "xywh":
+                bbox = [x_min, y_min, x_max - x_min, y_max - y_min]
+            elif format == "x1y1x2y2":
+                bbox = [x_min, y_min, x_max, y_max]
+            else:
+                raise ValueError("Format must be either 'xywh' or 'x1y1x2y2'.")
+            bboxes.append(bbox)
+        if return_tensors:
+            return torch.tensor(bboxes).float().to(device)
+        else:
+            return bboxes
+
 
 class InstanceMasksResponse(BaseModel):
     type: str = "instance_masks"

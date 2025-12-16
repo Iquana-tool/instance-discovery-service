@@ -1,8 +1,12 @@
+import numpy as np
 import torch
+from PIL.Image import fromarray
+from geco.models.geco import GeCo
+from torchvision import ops
+from torchvision import transforms
 
 from app.schemas.inference import Request, InstanceMasksResponse, BBoxesResponse
 from models.base_models import BaseModel
-from geco.models.geco import GeCo
 
 
 class GeCoCompletion(BaseModel):
@@ -16,18 +20,57 @@ class GeCoCompletion(BaseModel):
                  device: str = 'auto',):
         super().__init__()
         self.device = ('cuda' if torch.cuda.is_available() else 'cpu') if device == 'auto' else device
+        self.image_size = image_size
+        self.num_objects = num_objects
+        self.emb_dim = emb_dim
+        self.num_heads = num_heads
+        self.kernel_dim = kernel_dim
+        self.reduction = reduction
         self.model = GeCo.from_pretrained(
-            image_size=image_size,
-            num_objects=num_objects,
-            emb_dim=emb_dim,
-            num_heads=num_heads,
-            kernel_dim=kernel_dim,
+            image_size=self.image_size,
+            num_objects=self.num_objects,
+            emb_dim=self.emb_dim,
+            num_heads=self.num_heads,
+            kernel_dim=self.kernel_dim,
             train_backbone=False,
-            reduction=reduction,
+            reduction=self.reduction,
             zero_shot=False,
             inference_mode=True,
             return_masks=True)
         self.model.to(self.device)
 
     def process_request(self, image, request: Request) -> InstanceMasksResponse | BBoxesResponse:
-        pass
+        if isinstance(image, np.ndarray):
+            image = fromarray(image)
+        image = image.resize((self.image_size, self.image_size))
+        self.model.eval()
+        with torch.no_grad():
+            image_tensor = torch.from_numpy(np.array(image) / 255.).float().to(self.device)
+            if image_tensor.shape[0] != (3, self.image_size, self.image_size):
+                image_tensor = image_tensor.permute(2, 0, 1)
+            image_tensor = image_tensor.unsqueeze(0)
+            image_tensor = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])(image_tensor)
+            bboxes = request.get_bboxes(
+                format="x1y1x2y2",
+                return_tensors=True,
+                device=self.device,
+                relative_coordinates=True,
+                resize_to=(self.image_size, self.image_size),
+            ).unsqueeze(0)
+            outputs, _, _, _ = self.model.forward(image_tensor, bboxes)
+            print("GeCo done")
+            output = outputs[0]
+            print("Original number of objects:\t", len(output["pred_boxes"]))
+            selector = output['box_v'] > output['box_v'].max() / 8  # This is from the GeCo repo, im not really sure what it does
+            print("Selected:\t", torch.sum(selector).item())
+            keep = ops.nms(output['pred_boxes'][selector],
+                           output['scores'][selector],
+                           0.)
+            print("After NMS:\t", keep.shape[0])
+            selected_masks = output['pred_masks'][selector.squeeze()]
+            print(f"Selected masks:\t", selected_masks.shape)
+            nms_masks = selected_masks[keep]
+            print(f"NMS masks:\t", nms_masks.shape)
+            masks = nms_masks.cpu().numpy()
+            scores = ((output["scores"][selector])[keep]).cpu().tolist()
+        return InstanceMasksResponse(masks=masks.tolist(), scores=scores)
