@@ -6,10 +6,13 @@ def iom(mask1, mask2):
     return intersection / minimum
 
 
-def filter_seed_masks(combined_seed_mask: np.ndarray, new_masks: list[np.ndarray]) -> list:
+def filter_seed_masks(
+        combined_seed_mask: np.ndarray,
+        new_masks: list[np.ndarray],
+        iom_threshold: float = 0.) -> list:
     keep_idx: list[int] = []
     for j, new_mask in enumerate(new_masks):
-        if iom(combined_seed_mask, new_mask) < 0.2:
+        if iom(combined_seed_mask, new_mask) <= iom_threshold:
             keep_idx.append(j)
     return keep_idx
 
@@ -22,6 +25,6 @@ def filter_seed_bboxes(combined_seed_mask: np.ndarray, bboxes: list[np.ndarray])
         box_mask = np.zeros_like(combined_seed_mask, dtype=np.bool)
         box_mask[y1:y2, x1:x2] = True
         # Only keep boxes with minimal overlap (e.g., < 50% of box area) and inside a certain area range
-        if iom(combined_seed_mask, box_mask) < 0.5:
+        if iom(combined_seed_mask, box_mask) <= 0.5:
             keep_idx.append(i)
     return keep_idx

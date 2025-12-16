@@ -86,17 +86,15 @@ class CosineSimilarityModel(BaseModel):
         normalized_boxes = []
         scores = []
         for box in filtered_boxes:
-            x1, y1, x2, y2 = box
+            x1, y1, x2, y2 = box.astype(int)
             scores.append(np.average(final_sim_map[y1:y2, x1:x2]).item())
             norm_x1 = float(x1 / w)
             norm_y1 = float(y1 / h)
             norm_x2 = float(x2 / w)
             norm_y2 = float(y2 / h)
-            norm_box_area = (norm_x2 - norm_x1) * (norm_y2 - norm_y1)
-            if min_area <= norm_box_area <= max_area:
-                normalized_boxes.append([
-                    norm_x1, norm_y1, norm_x2, norm_y2,
-                ])
+            normalized_boxes.append([
+                norm_x1, norm_y1, norm_x2, norm_y2,
+            ])
 
         print(f"Detected {len(normalized_boxes)} objects after filtering seed overlaps.")
         return BBoxesResponse(

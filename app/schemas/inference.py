@@ -14,14 +14,13 @@ class Request(BaseModel):
                                                 description="Seeds is a list of binary masks.")
 
     def get_combined_seed_mask(self, size) -> np.ndarray:
-        combined_seed_mask = np.zeros(self.max_image_size, dtype=np.bool)
-        min_area, max_area = 1, 0
+        combined_seed_mask = np.zeros(size, dtype=bool)
         for seed in self.seeds:
-            seed_mask = np.array(seed, dtype=np.bool)
-            min_area = min(min_area, np.count_nonzero(seed_mask) / seed_mask.size)
-            max_area = max(max_area, np.count_nonzero(seed_mask) / seed_mask.size)
-            seed_mask = np.array(fromarray(seed_mask).resize(size))
+            seed_mask = np.array(seed, dtype=bool)
+            seed_mask = cv2.resize(seed_mask.astype(np.uint8), size[::-1]).astype(bool)
+            print(seed_mask.shape)
             combined_seed_mask = np.logical_or(combined_seed_mask, seed_mask)
+
         return combined_seed_mask
 
     @property

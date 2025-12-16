@@ -57,7 +57,7 @@ class GeCoCompletion(BaseModel):
                 relative_coordinates=True,
                 resize_to=(self.image_size, self.image_size),
             ).unsqueeze(0)
-            outputs, _, _, _ = self.model.forward(image_tensor, bboxes)
+            outputs, _, _, _ = self.model(image_tensor, bboxes)
             print("GeCo done")
             output = outputs[0]
             print("Original number of objects:\t", len(output["pred_boxes"]))
