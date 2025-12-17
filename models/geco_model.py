@@ -73,4 +73,4 @@ class GeCoCompletion(BaseModel):
             print(f"NMS masks:\t", nms_masks.shape)
             masks = nms_masks.cpu().numpy()
             scores = ((output["scores"][selector])[keep]).cpu().tolist()
-        return InstanceMasksResponse(masks=masks.tolist(), scores=scores)
+        return InstanceMasksResponse.from_masks(masks, scores)

@@ -29,7 +29,7 @@ class SAM3Completion(BaseModel):
         # Preprocess the image and prompts
         inputs = self.processor(
             images=image,
-            text="",
+            text="visual",
             input_boxes=bboxes.unsqueeze(0),
             input_boxes_labels=bbox_labels,
             return_tensors="pt"
@@ -38,22 +38,20 @@ class SAM3Completion(BaseModel):
         with torch.no_grad():
             outputs = self.model(**inputs)
 
+        print(f"Found objects:\t{len(outputs['pred_masks'])}")
         # Post-process results
         results = self.processor.post_process_instance_segmentation(
             outputs,
             threshold=self.threshold,
             mask_threshold=0.5,
-            target_sizes=inputs.get("original_sizes").tolist()[::-1]
+            target_sizes=inputs.get("original_sizes").tolist()
         )[0]
 
-        print(f"Found objects:\t{len(results['masks'])}")
+        print(f"After postprocessing:\t{len(results['masks'])}")
         masks = results["masks"].cpu().numpy()
         scores = results["scores"].cpu().numpy()
-        keep_ids = filter_seed_masks(request.get_combined_seed_mask(inputs.get("original_sizes").tolist()[0]), masks)
+        keep_ids = filter_seed_masks(request.get_combined_seed_mask(inputs.get("original_sizes").tolist()), masks)
         print(f"After filtering: {len(keep_ids)}")
-        return InstanceMasksResponse(
-            masks=masks[keep_ids].tolist(),
-            scores=scores[keep_ids].tolist(),
-        )
+        return InstanceMasksResponse.from_masks(masks[keep_ids], scores[keep_ids])
 
 

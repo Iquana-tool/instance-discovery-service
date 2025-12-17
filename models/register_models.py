@@ -9,11 +9,11 @@ def register_models(model_registry: ModelRegistry):
     """ This function registers all models in the MODEL_REGISTRY. You can extend it to add custom models. """
     model_registry.register_model(
         ModelInfo(
-            identifier_str="dino_1000_cosine_he_max_agg",
-            name="Cosine similarity predictor with dino backbone",
-            description="A dual encoder decoder architecture using DINO v3 backbone with an image size of 1000 px. The "
+            identifier_str="cosine_sim",
+            name="Cosine similarity predictor",
+            description="A dual encoder decoder architecture using DINO v3 backbone with an image size of 1024 px. The "
                         "decoder uses cosine similarity with maximum similarity aggregation and histogram equalization "
-                        "to find similar objects.",
+                        "to find similar objects in the image. SAM is used to refine the proposed masks.",
             tags=["Experimental"],
             supports_refinement=False,
         ),
@@ -45,7 +45,7 @@ def register_models(model_registry: ModelRegistry):
         ModelInfo(
             identifier_str='geco',
             name="GeCo",
-            description="GeCo, a novel low-shot counter that achieves accurate object detection, segmentation, and "
+            description="GeCo, a low-shot counter that achieves accurate object detection, segmentation, and "
                         "count estimation in a unified architecture. GeCo robustly generalizes the prototypes across "
                         "objects appearances through a novel dense object query formulation.",
             tags=["SOTA"],

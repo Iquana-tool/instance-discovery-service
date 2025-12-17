@@ -1,9 +1,10 @@
-from typing import Any, Literal, LiteralString
+from pycocotools import mask as maskUtils
+import numpy as np
+from typing import Literal
 
 import cv2
 import numpy as np
 import torch
-from PIL.Image import fromarray
 from pydantic import BaseModel, Field
 
 
@@ -14,10 +15,10 @@ class Request(BaseModel):
                                                 description="Seeds is a list of binary masks.")
 
     def get_combined_seed_mask(self, size) -> np.ndarray:
-        combined_seed_mask = np.zeros(size, dtype=bool)
+        combined_seed_mask = np.zeros(tuple(size), dtype=bool)
         for seed in self.seeds:
             seed_mask = np.array(seed, dtype=bool)
-            seed_mask = cv2.resize(seed_mask.astype(np.uint8), size[::-1]).astype(bool)
+            seed_mask = cv2.resize(seed_mask.astype(np.uint8), size).astype(bool)
             print(seed_mask.shape)
             combined_seed_mask = np.logical_or(combined_seed_mask, seed_mask)
 
@@ -69,12 +70,25 @@ class Request(BaseModel):
 
 class InstanceMasksResponse(BaseModel):
     type: str = "instance_masks"
-    masks: list[list[list[bool]]] = Field(..., description="Masks is a list of binary masks. One for each object.")
+    masks: list[dict] = Field(..., description="Masks is a list of rle encoded masks. One for each object.")
     scores: list[float] = Field(..., description="Scores is a list of float values indicating the confidence of each mask.")
 
     @property
     def n_objects(self) -> int:
         return len(self.masks)
+
+    @classmethod
+    def from_masks(cls, masks: np.ndarray, scores):
+        rle_masks = []
+        for mask in masks:
+            rle = maskUtils.encode(np.asfortranarray(mask.astype(np.uint8)))
+            rle_masks.append(rle)
+        if isinstance(scores, np.ndarray):
+            scores = scores.tolist()
+        return cls(
+            masks=rle_masks,
+            scores=scores,
+        )
 
 
 class BBoxesResponse(BaseModel):
