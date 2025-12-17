@@ -1,8 +1,6 @@
 import cv2
 import numpy as np
 import torch
-from torchvision.transforms.functional import resize
-import plotly.express as px
 from models.predictors.predictor import SimilarityPredictor
 
 

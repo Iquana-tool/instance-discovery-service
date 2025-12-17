@@ -3,7 +3,6 @@ from typing import Union
 import cv2
 import numpy as np
 import torch
-import plotly.express as px
 from PIL.Image import Image, fromarray
 from torchvision.ops import batched_nms
 
@@ -50,7 +49,6 @@ class CosineSimilarityModel(BaseModel):
             self.predictor.reset()
             self.predictor.add_seed_instance(embedded_img[seed_mask])
             sim_map = self.predictor.get_similarity_map(embedded_img)
-            px.imshow(sim_map).show()
             sim_maps.append(sim_map)
         final_sim_map = torch.mean(torch.stack(sim_maps), dim=0).cpu().numpy()
         final_sim_map = (final_sim_map * 255).astype(np.uint8)
@@ -58,7 +56,6 @@ class CosineSimilarityModel(BaseModel):
 
         # 4. Adaptive thresholding
         _, thresholded = cv2.threshold(final_sim_map, 230, 255, cv2.THRESH_BINARY)
-        px.imshow(thresholded).show()
         print("Applied adaptive thresholding.")
 
         # 5. Connected component analysis for bounding boxes
