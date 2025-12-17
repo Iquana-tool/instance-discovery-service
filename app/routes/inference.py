@@ -18,8 +18,8 @@ async def infer_instances(request: Request):
                                                                           "Make sure to upload an image to this service "
                                                                           "first before running inference.")
     image = IMAGE_CACHE.get(request.user_id)
-    if not request.user_id in MODEL_CACHE:
-        MODEL_CACHE.put(request.user_id, MODEL_REGISTRY.load_model(request.model_key))
+    if not MODEL_CACHE.check_if_loaded(request.user_id, request.model_key):
+        MODEL_CACHE.put(request.user_id, request.model_key, MODEL_REGISTRY.load_model(request.model_key))
     model: BaseModel = MODEL_CACHE.get(request.user_id)
     response = model.process_request(image, request)
     return {

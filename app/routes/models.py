@@ -27,7 +27,7 @@ async def load_model(model_id: str, user_id: str):
     """ Loads a model into the cache if not already loaded. This is a convenience endpoint; models are loaded
         automatically when needed, but this can be called at the start
         of an annotation session to preload the model."""
-    if MODEL_CACHE.check_if_loaded(user_id):
+    if MODEL_CACHE.check_if_loaded(user_id, model_id):
         return {
             "success": True,
             "message": f"Model {model_id} is already loaded in cache.",
@@ -36,7 +36,7 @@ async def load_model(model_id: str, user_id: str):
     else:
         try:
             model = MODEL_REGISTRY.load_model(model_id)
-            MODEL_CACHE.put(user_id, model)
+            MODEL_CACHE.put(user_id, model_id, model)
             return {
                 "success": True,
                 "message": f"Model {model_id} loaded successfully to cache.",
