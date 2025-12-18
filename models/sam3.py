@@ -19,18 +19,18 @@ class SAM3Completion(BaseModel):
     def process_request(self, image, request: Request) -> InstanceMasksResponse:
         # Extract the prompts from the given instance masks
         bboxes = request.get_bboxes(
-            format="xywh",
-            relative_coordinates=True,
+            format="cxcywh",
+            relative_coordinates=False,
             device="cpu",
-            return_tensors=True,
+            return_tensors=False,
             resize_to=None
         )
         bbox_labels = torch.ones(len(bboxes), dtype=torch.float32).unsqueeze(0)
+        print(image.shape)
         # Preprocess the image and prompts
         inputs = self.processor(
-            images=image,
-            text="visual",
-            input_boxes=bboxes.unsqueeze(0),
+            images=[image],
+            input_boxes=[bboxes],
             input_boxes_labels=bbox_labels,
             return_tensors="pt"
         )
@@ -49,8 +49,9 @@ class SAM3Completion(BaseModel):
 
         print(f"After postprocessing:\t{len(results['masks'])}")
         masks = results["masks"].cpu().numpy()
+        print(masks.shape)
         scores = results["scores"].cpu().numpy()
-        keep_ids = filter_seed_masks(request.get_combined_seed_mask(inputs.get("original_sizes").tolist()), masks)
+        keep_ids = filter_seed_masks(request.get_combined_seed_mask(inputs.get("original_sizes").tolist()[0]), masks)
         print(f"After filtering: {len(keep_ids)}")
         return InstanceMasksResponse.from_masks(masks[keep_ids], scores[keep_ids])
 

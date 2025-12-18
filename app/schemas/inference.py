@@ -15,10 +15,11 @@ class Request(BaseModel):
                                                 description="Seeds is a list of binary masks.")
 
     def get_combined_seed_mask(self, size) -> np.ndarray:
+        print(size)
         combined_seed_mask = np.zeros(tuple(size), dtype=bool)
         for seed in self.seeds:
             seed_mask = np.array(seed, dtype=bool)
-            seed_mask = cv2.resize(seed_mask.astype(np.uint8), size).astype(bool)
+            seed_mask = cv2.resize(seed_mask.astype(np.uint8), size[::-1]).astype(bool)
             print(seed_mask.shape)
             combined_seed_mask = np.logical_or(combined_seed_mask, seed_mask)
 
@@ -34,7 +35,7 @@ class Request(BaseModel):
         return min_area, max_area
 
     def get_bboxes(self,
-                   format: Literal["xywh", "x1y1x2y2"] = "x1y1x2y2",
+                   format: Literal["xywh", "x1y1x2y2", "cxcywh"] = "x1y1x2y2",
                    return_tensors: bool = True,
                    device: Literal["cpu", "cuda"] | None = None,
                    relative_coordinates: bool = True,
@@ -46,10 +47,10 @@ class Request(BaseModel):
             if resize_to:
                 seed_mask = cv2.resize(seed_mask.astype(np.uint8), resize_to)
             indices = np.argwhere(seed_mask.astype(bool))
-            x_min = np.min(indices[1]).item()
-            y_min = np.min(indices[0]).item()
-            x_max = np.max(indices[1]).item()
-            y_max = np.max(indices[0]).item()
+            x_min = np.min(indices[0]).item()
+            y_min = np.min(indices[1]).item()
+            x_max = np.max(indices[0]).item()
+            y_max = np.max(indices[1]).item()
             if relative_coordinates:
                 x_min /= seed_mask.shape[1]
                 y_min /= seed_mask.shape[0]
@@ -59,6 +60,12 @@ class Request(BaseModel):
                 bbox = [x_min, y_min, x_max - x_min, y_max - y_min]
             elif format == "x1y1x2y2":
                 bbox = [x_min, y_min, x_max, y_max]
+            elif format == "cxcywh":
+                w = x_max - x_min
+                h = y_max - y_min
+                cx = x_min + w / 2
+                cy = y_min + h / 2
+                bbox = [cx, cy, w, h]
             else:
                 raise ValueError("Format must be either 'xywh' or 'x1y1x2y2'.")
             bboxes.append(bbox)
