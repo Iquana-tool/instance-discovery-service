@@ -60,12 +60,12 @@ class GeCoCompletion(BaseModel):
             outputs, _, _, _ = self.model(image_tensor, bboxes)
             print("GeCo done")
             output = outputs[0]
-            print("Original number of objects:\t", len(output["pred_boxes"]))
-            selector = output['box_v'] > output['box_v'].max() / 8  # This is from the GeCo repo, im not really sure what it does
+            print("Original number of objects:\t", output["pred_boxes"].shape)
+            selector = output['box_v'] > output['box_v'].max() / 12  # This is from the GeCo repo, im not really sure what it does
             print("Selected:\t", torch.sum(selector).item())
             keep = ops.nms(output['pred_boxes'][selector],
-                           output['scores'][selector],
-                           0.)
+                           output['box_v'][selector],
+                           0.2)
             print("After NMS:\t", keep.shape[0])
             selected_masks = output['pred_masks'][selector.squeeze()]
             print(f"Selected masks:\t", selected_masks.shape)
@@ -73,4 +73,4 @@ class GeCoCompletion(BaseModel):
             print(f"NMS masks:\t", nms_masks.shape)
             masks = nms_masks.cpu().numpy()
             scores = ((output["scores"][selector])[keep]).cpu().tolist()
-        return InstanceMasksResponse.from_masks(masks, scores)
+        return InstanceMasksResponse.from_masks(masks, scores, postprocess_request=request)

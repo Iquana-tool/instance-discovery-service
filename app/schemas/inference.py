@@ -1,24 +1,34 @@
 from pycocotools import mask as maskUtils
 import numpy as np
-from typing import Literal
+from typing import Literal, Any
 
 import cv2
 import numpy as np
 import torch
 from pydantic import BaseModel, Field
 
+from util.postprocess import filter_seed_masks
+
 
 class Request(BaseModel):
     model_key: str = Field(..., description="The key of the model.")
     user_id: str = Field(..., description="The user id of the model.")
-    seeds: list[list[list[bool]]] = Field(...,
-                                                description="Seeds is a list of binary masks.")
+    seeds: list[dict] = Field(..., description="Seeds is a list of rle encoded binary masks")
+    concept: str | None = Field(default=None,
+                                description="Optional str describing the concept of the objects to be detected.")
+
+    @property
+    def masks(self) -> list[np.ndarray]:
+        masks = []
+        for rle in self.seeds:
+            masks.append(maskUtils.decode(rle))
+        return masks
 
     def get_combined_seed_mask(self, size) -> np.ndarray:
         print(size)
         combined_seed_mask = np.zeros(tuple(size), dtype=bool)
-        for seed in self.seeds:
-            seed_mask = np.array(seed, dtype=bool)
+        for mask in self.masks:
+            seed_mask = np.array(mask, dtype=bool)
             seed_mask = cv2.resize(seed_mask.astype(np.uint8), size[::-1]).astype(bool)
             print(seed_mask.shape)
             combined_seed_mask = np.logical_or(combined_seed_mask, seed_mask)
@@ -42,8 +52,8 @@ class Request(BaseModel):
                    resize_to: None | tuple[int, int] = None) \
             -> list[list[float]] | torch.Tensor:
         bboxes = []
-        for seed in self.seeds:
-            seed_mask = np.array(seed, dtype=np.bool)
+        for mask in self.masks:
+            seed_mask = np.array(mask, dtype=np.bool)
             if resize_to:
                 seed_mask = cv2.resize(seed_mask.astype(np.uint8), resize_to)
             indices = np.argwhere(seed_mask.astype(bool))
@@ -85,7 +95,14 @@ class InstanceMasksResponse(BaseModel):
         return len(self.masks)
 
     @classmethod
-    def from_masks(cls, masks: np.ndarray, scores):
+    def from_masks(cls, masks: np.ndarray, scores, postprocess_request: Request | None = None):
+        if postprocess_request is not None:
+            # We postprocess the results with our request, eg by filtering masks that were already in the request.
+            keep_ids = filter_seed_masks(postprocess_request.get_combined_seed_mask(masks.shape[1:]),
+                                         masks)
+            if len(keep_ids) < len(masks):
+                print(f"After filtering with seeds: {len(keep_ids)}")
+            masks = masks[keep_ids]
         rle_masks = []
         for mask in masks:
             rle = maskUtils.encode(np.asfortranarray(mask.astype(np.uint8)))

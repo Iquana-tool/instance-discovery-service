@@ -43,8 +43,8 @@ class CosineSimilarityModel(BaseModel):
 
         # 3. Process seeds separately and average similarity maps
         sim_maps = []
-        for seed in request.seeds:
-            seed_mask = np.array(seed, dtype=np.bool)
+        for mask in request.masks:
+            seed_mask = np.array(mask, dtype=np.bool)
             seed_mask = np.array(fromarray(seed_mask).resize(self.max_image_size))
             self.predictor.reset()
             self.predictor.add_seed_instance(embedded_img[seed_mask])

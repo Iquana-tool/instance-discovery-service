@@ -30,6 +30,7 @@ class SAM3Completion(BaseModel):
         # Preprocess the image and prompts
         inputs = self.processor(
             images=[image],
+            text=request.concept,
             input_boxes=[bboxes],
             input_boxes_labels=bbox_labels,
             return_tensors="pt"
@@ -51,8 +52,6 @@ class SAM3Completion(BaseModel):
         masks = results["masks"].cpu().numpy()
         print(masks.shape)
         scores = results["scores"].cpu().numpy()
-        keep_ids = filter_seed_masks(request.get_combined_seed_mask(inputs.get("original_sizes").tolist()[0]), masks)
-        print(f"After filtering: {len(keep_ids)}")
-        return InstanceMasksResponse.from_masks(masks[keep_ids], scores[keep_ids])
+        return InstanceMasksResponse.from_masks(masks, scores, postprocess_request=request)
 
 
