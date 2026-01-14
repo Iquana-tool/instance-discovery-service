@@ -14,7 +14,7 @@ class Request(BaseModel):
     model_key: str = Field(..., description="The key of the model.")
     user_id: str = Field(..., description="The user id of the model.")
     seeds: list[dict] = Field(..., description="Seeds is a list of rle encoded binary masks")
-    negative_seeds: list[dict] | None = Field(..., description="Negative seeds is a list of rle encoded binary masks")
+    negative_seeds: list[dict] | None = Field(default=[], description="Negative seeds is a list of rle encoded binary masks")
     concept: str | None = Field(default=None,
                                 description="Optional str describing the concept of the objects to be detected.")
 

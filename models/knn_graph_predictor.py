@@ -11,8 +11,8 @@ from torchvision.ops import batched_nms
 
 from app.schemas.inference import BBoxesResponse
 from models.base_models import BaseModel
-from models.encoders.dino import DinoModelType, DinoModel
-from models.encoders.encoder import Encoder
+from models.encoders.dino_encoder import DinoModelType, DinoModel
+from models.encoders.encoder_base_class import Encoder
 from util.postprocess import filter_seed_bboxes
 
 
@@ -45,7 +45,7 @@ def graph_based_propagation(embedded_img, seed_mask, k=5, sigma=1.0):
     for i in range(n_pixels):
         for j, dist in zip(indices[i], distances[i]):
             if i != j:
-                affinity[i, j] = np.exp(-dist**2 / (2 * sigma**2))
+                affinity[i, j] = np.exp(-dist ** 2 / (2 * sigma ** 2))
 
     # Propagate labels
     labels = -1 * np.ones(n_pixels, dtype=np.int32)
@@ -84,11 +84,11 @@ class KNNGraphPredictor(BaseModel):
             self.max_image_size = max_image_size
         if backbone is None:
             self.backbone = DinoModel(
-                                        device="auto",
-                                        model_type=DinoModelType.VITL16,
-                                        patch_size=16,
-                                        image_size=512,
-                                    )
+                device="auto",
+                model_type=DinoModelType.VITL16,
+                patch_size=16,
+                image_size=512,
+            )
         else:
             self.backbone = backbone
 

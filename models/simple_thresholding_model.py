@@ -7,9 +7,9 @@ import torch
 from PIL.Image import Image, fromarray
 from app.schemas.inference import BBoxesResponse, InstanceMasksResponse
 from models.base_models import BaseModel
-from models.encoders.dino import DinoModel, DinoModelType
-from models.encoders.encoder import Encoder
-from models.predictors.cosine_similarity_predictor import CosineSimilarity
+from models.encoders.dino_encoder import DinoModel, DinoModelType
+from models.encoders.encoder_base_class import Encoder
+from models.similarity.cosine_similarity import CosineSimilarity
 from util.postprocess import extract_masklets
 
 

@@ -9,7 +9,8 @@ from PIL import Image
 from sklearn.decomposition import PCA
 from transformers import AutoImageProcessor, DINOv3ViTModel, DINOv3ViTConfig, DINOv3ViTImageProcessorFast
 
-from models.encoders.encoder import Encoder
+from models.encoders.encoder_base_class import Encoder
+from util.misc import get_device_from_str
 
 
 class DinoModelType(Enum):
@@ -46,48 +47,6 @@ MODEL_TO_NUM_LAYERS = {
 }
 
 
-def uniform_sphere_energy(embeddings, lr=0.01, steps=100, beta=1.0):
-    """
-    Redistribute embeddings on a hypersphere to minimize energy (maximize uniformity).
-
-    Args:
-        embeddings: Tensor of shape (n_points, n_features)
-        lr: Learning rate for gradient descent
-        steps: Number of optimization steps
-        beta: Strength of repulsion (higher = stronger repulsion)
-    """
-    # Ensure embeddings are on the unit sphere
-    embeddings = F.normalize(embeddings, p=2, dim=1)
-
-    # Clone to avoid modifying the original tensor
-    embeddings = embeddings.clone().detach().requires_grad_(True)
-
-    # Optimizer
-    optimizer = torch.optim.Adam([embeddings], lr=lr)
-
-    # Energy function: sum of inverse distances
-    def energy(x):
-        # Pairwise distances (cosine distance on the sphere)
-        dists = 1 - torch.mm(x, x.t())  # 1 - cos(theta) = 2*sin^2(theta/2)
-        # Avoid division by zero and self-distance
-        dists = dists * (1 - torch.eye(dists.shape[0], device=x.device))
-        # Inverse distance energy
-        E = torch.sum(1.0 / (dists + 1e-8))
-        return E
-
-    # Optimization loop
-    for _ in range(steps):
-        optimizer.zero_grad()
-        E = energy(embeddings)
-        E.backward()
-        optimizer.step()
-        # Re-project to the unit sphere after each step
-        with torch.no_grad():
-            embeddings.data = F.normalize(embeddings, p=2, dim=1)
-
-    return embeddings.detach()
-
-
 class DinoModel(Encoder):
     def __init__(self,
                  model_type: DinoModelType,
@@ -98,7 +57,7 @@ class DinoModel(Encoder):
                  device='auto'):
         self.model_type = model_type
         hf_url = MODEL_TO_HF_URL[model_type]
-        self.device = ('cuda' if torch.cuda.is_available() else 'cpu') if device == 'auto' else device
+        self.device = get_device_from_str(device)
 
         self.n_layers = MODEL_TO_NUM_LAYERS[model_type]
         self.patch_size = patch_size
@@ -122,6 +81,10 @@ class DinoModel(Encoder):
             config=self.config
         )
         self.model.to(self.device)
+
+    @property
+    def embedding_dim(self) -> int:
+        return self.config.hidden_size
 
     def preprocess(self, image: Image.Image):
         w = image.width

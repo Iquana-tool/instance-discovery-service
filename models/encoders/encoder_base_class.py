@@ -26,3 +26,8 @@ class Encoder(ABC):
         """
         pass
 
+    @property
+    @abstractmethod
+    def embedding_dim(self) -> int:
+        """ Return the dimension of the embedding space. Important for learning models to adapt to the output dimension."""
+        pass

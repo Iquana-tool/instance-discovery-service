@@ -1,4 +1,5 @@
 from models.dbscan_predictor import DBSCANPredictor, DBScanModel
+from models.few_shot_finetuning import FewShotFineTuningModel
 from models.simple_thresholding_model import Dino1000CosineHeMaxAgg
 from models.geco_model import GeCoCompletion
 from models.knn_graph_predictor import KNNGraphPredictor
@@ -57,22 +58,19 @@ def register_models(model_registry: ModelRegistry):
     )
     model_registry.register_model(
         ModelInfo(
-            identifier_str='dbscan',
-            name="DBSCAN Cluster Model",
+            identifier_str='fshead',
+            name="Few-Shot MLP",
             description="""
-            A DBSCAN-based clustering model for self-supervised object discovery in high-dimensional embeddings (e.g., DINO, SAM).
-            Uses density-based clustering to group similar regions, ideal for segmenting objects (e.g., penguins) without ground truth labels.
-            Works well with exemplar-guided segmentation: provide 1+ seed masks to identify all instances of the target class.
-            Optimized for static embeddings and supports fast inference for interactive applications.
+            This model trains a small MLP on top of DINOv3 embeddings to reproduce the given annotations and at the same
+            time detect new objects.
             """,
             tags=[
-                "experimental", "clustering", "self-supervised", "density-based",
-                "interactive-ml", "segmentation", "embedding-analysis"
+                "experimental", "few-shot"
             ],
             supports_refinement=False,
         ),
         ModelLoader(
-            loader_function=DBScanModel,  # Corrected to match your implementation
+            loader_function=FewShotFineTuningModel,
         )
     )
 

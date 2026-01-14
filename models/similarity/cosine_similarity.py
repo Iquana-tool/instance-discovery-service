@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import torch
-from models.predictors.predictor import SimilarityMetric
+from models.similarity.similarity_base_class import SimilarityMetric
 
 
 class CosineSimilarity(SimilarityMetric):

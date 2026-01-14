@@ -5,7 +5,7 @@ from sklearn.cluster import DBSCAN
 
 from app.schemas.inference import InstanceMasksResponse
 from models.base_models import BaseModel
-from models.encoders.dino import DinoModel, DinoModelType
+from models.encoders.dino_encoder import DinoModel, DinoModelType
 from util.postprocess import extract_masklets
 
 
