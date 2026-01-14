@@ -1,12 +1,12 @@
 from typing import Union, Literal
 
+import cv2
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
 from PIL.Image import fromarray
-import cv2
-import plotly.express as px
+
 from app.schemas.inference import InstanceMasksResponse
 from models.base_models import BaseModel
 from models.encoders.dino_encoder import DinoModel, DinoModelType
@@ -127,15 +127,12 @@ class FewShotFineTuningModel(BaseModel):
 
         # Convert scores to 0-255 range for thresholding
         scores = (scores * 255).astype(np.uint8)
-        print(scores.shape)
-        fig = px.imshow(scores)
-        fig.show()
+
 
         # Adaptive thresholding: use median of scores under positive masks
         combined_seed_mask = request.get_combined_seed_mask(self.max_image_size)
-        threshold = np.median(scores[combined_seed_mask]).item()
+        threshold = np.median(scores[combined_seed_mask]).item() - 1
         _, thresholded = cv2.threshold(scores, threshold, 255, cv2.THRESH_BINARY)
-
         # Extract masklets
         masklets, scores = extract_masklets(thresholded, scores)
 

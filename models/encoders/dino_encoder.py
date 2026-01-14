@@ -1,15 +1,14 @@
 from enum import Enum
 from typing import Literal
 
-import plotly.express as px
 import torch
-import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 from PIL import Image
 from sklearn.decomposition import PCA
 from transformers import AutoImageProcessor, DINOv3ViTModel, DINOv3ViTConfig, DINOv3ViTImageProcessorFast
 
 from models.encoders.encoder_base_class import Encoder
+from util.debug import debug_show_pca_of_embedding
 from util.misc import get_device_from_str
 
 
@@ -154,11 +153,6 @@ class DinoModel(Encoder):
                     ).permute(1, 2, 0)
 
                 # Visualizing the PCA here for debugging
-                if debug_pca:
-                    pca = PCA(n_components=3, whiten=True)
-                    output_cpu = embeddings.flatten(end_dim=1).cpu().numpy()
-                    projection = pca.fit_transform(output_cpu).reshape(og_h, og_w, 3)
-                    projection = (projection - projection.min()) / (projection.max() - projection.min())
-                    px.imshow(projection).show()
+                if debug_pca: debug_show_pca_of_embedding(embeddings)
                 return embeddings
 
