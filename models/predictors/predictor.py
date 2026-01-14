@@ -3,7 +3,7 @@ import torch
 import numpy as np
 
 
-class SimilarityPredictor(ABC):
+class SimilarityMetric(ABC):
     @abstractmethod
     def reset(self):
         """ Reset the predictor to its initial state. """

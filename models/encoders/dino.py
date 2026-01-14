@@ -2,6 +2,7 @@ from enum import Enum
 
 import plotly.express as px
 import torch
+import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 from PIL import Image
 from sklearn.decomposition import PCA
@@ -42,6 +43,48 @@ MODEL_TO_NUM_LAYERS = {
     DinoModelType.VITH16PLUS: 32,
     DinoModelType.VIT7B16: 40,
 }
+
+
+def uniform_sphere_energy(embeddings, lr=0.01, steps=100, beta=1.0):
+    """
+    Redistribute embeddings on a hypersphere to minimize energy (maximize uniformity).
+
+    Args:
+        embeddings: Tensor of shape (n_points, n_features)
+        lr: Learning rate for gradient descent
+        steps: Number of optimization steps
+        beta: Strength of repulsion (higher = stronger repulsion)
+    """
+    # Ensure embeddings are on the unit sphere
+    embeddings = F.normalize(embeddings, p=2, dim=1)
+
+    # Clone to avoid modifying the original tensor
+    embeddings = embeddings.clone().detach().requires_grad_(True)
+
+    # Optimizer
+    optimizer = torch.optim.Adam([embeddings], lr=lr)
+
+    # Energy function: sum of inverse distances
+    def energy(x):
+        # Pairwise distances (cosine distance on the sphere)
+        dists = 1 - torch.mm(x, x.t())  # 1 - cos(theta) = 2*sin^2(theta/2)
+        # Avoid division by zero and self-distance
+        dists = dists * (1 - torch.eye(dists.shape[0], device=x.device))
+        # Inverse distance energy
+        E = torch.sum(1.0 / (dists + 1e-8))
+        return E
+
+    # Optimization loop
+    for _ in range(steps):
+        optimizer.zero_grad()
+        E = energy(embeddings)
+        E.backward()
+        optimizer.step()
+        # Re-project to the unit sphere after each step
+        with torch.no_grad():
+            embeddings.data = F.normalize(embeddings, p=2, dim=1)
+
+    return embeddings.detach()
 
 
 class DinoModel(Encoder):
@@ -98,7 +141,13 @@ class DinoModel(Encoder):
                 dim = x.shape[0]
                 return x.view(dim, -1).permute(1, 0)
 
-    def embed_image(self, image: Image.Image, keep_dim=True, debug_pca=False) -> torch.Tensor:
+    def embed_image(self, image: Image.Image,
+                    recenter_embedding_vectors=True,
+                    normalize_embedding_vectors=True,
+                    apply_pca_whitening=False,
+                    standardize_features=True,
+                    keep_dim=True,
+                    debug_pca=False) -> torch.Tensor:
         with torch.inference_mode():
             with torch.autocast(device_type=self.device, dtype=torch.float32):
                 # Save the original size
@@ -115,8 +164,30 @@ class DinoModel(Encoder):
                 # We only need the last hidden state
                 last_hidden_state = outputs.last_hidden_state.squeeze()
                 cls_token, reg_token, embeddings = last_hidden_state[0], last_hidden_state[1:5], last_hidden_state[5:]
-                embeddings = embeddings.reshape(h_patches, w_patches, -1)
 
+                if recenter_embedding_vectors:
+                    # Recenter all feature vectors such that the origin is in the middle of them
+                    avg_embedding = embeddings.mean(dim=0)
+                    embeddings = embeddings - avg_embedding
+
+                if normalize_embedding_vectors:
+                    # L2 normalize each feature vector
+                    embeddings = F.normalize(embeddings, p=2, dim=1)
+
+                if standardize_features:
+                    # Standardize each feature dimension to zero mean and unit variance
+                    mean = embeddings.mean(dim=0, keepdim=True)
+                    std = embeddings.std(dim=0, keepdim=True)
+                    embeddings = (embeddings - mean) / (std + 1e-8)  # Add small epsilon to avoid division by zero
+
+                if apply_pca_whitening:
+                    # Apply PCA and whitening
+                    pca = PCA(n_components=embeddings.shape[1], whiten=True)
+                    embeddings_cpu = embeddings.cpu().numpy()
+                    embeddings_cpu = pca.fit_transform(embeddings_cpu)
+                    embeddings = torch.tensor(embeddings_cpu, device=self.device)
+
+                embeddings = embeddings.reshape(h_patches, w_patches, -1)
                 # Resize to original size if enabled
                 if keep_dim:
                     embeddings = TF.resize(
@@ -132,3 +203,4 @@ class DinoModel(Encoder):
                     projection = (projection - projection.min()) / (projection.max() - projection.min())
                     px.imshow(projection).show()
                 return embeddings
+

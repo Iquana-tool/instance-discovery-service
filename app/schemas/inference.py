@@ -19,20 +19,19 @@ class Request(BaseModel):
 
     @property
     def masks(self) -> list[np.ndarray]:
+        """ Returns an list of binary masks. Internally decodes the rle encoded masks."""
         masks = []
         for rle in self.seeds:
             masks.append(maskUtils.decode(rle))
         return masks
 
     def get_combined_seed_mask(self, size) -> np.ndarray:
-        print(size)
+        """ Returns all seed masks as one binary mask of the given size. """
         combined_seed_mask = np.zeros(tuple(size), dtype=bool)
         for mask in self.masks:
             seed_mask = np.array(mask, dtype=bool)
             seed_mask = cv2.resize(seed_mask.astype(np.uint8), size[::-1]).astype(bool)
-            print(seed_mask.shape)
             combined_seed_mask = np.logical_or(combined_seed_mask, seed_mask)
-
         return combined_seed_mask
 
     @property

@@ -1,10 +1,10 @@
 import cv2
 import numpy as np
 import torch
-from models.predictors.predictor import SimilarityPredictor
+from models.predictors.predictor import SimilarityMetric
 
 
-class CosineSimilarityPredictor(SimilarityPredictor):
+class CosineSimilarity(SimilarityMetric):
     def __init__(self,
                  device: str = "cuda",
                  memory_aggregation: str = "mean",
@@ -138,14 +138,14 @@ class CosineSimilarityPredictor(SimilarityPredictor):
         else:
             sim_map_np = sim_map.cpu().numpy()
             if self.similarity_redistribution_method == "norm":
-                return_sim_map = (sim_map_np - np.min(sim_map_np)) / (np.max(sim_map_np) - np.min(sim_map_np))
+                sim_map_np = (sim_map_np - np.min(sim_map_np).item()) / (np.max(sim_map_np).item() - np.min(sim_map_np).item())
             elif self.similarity_redistribution_method == "he":
-                return_sim_map = cv2.equalizeHist((sim_map_np * 255).astype(np.uint8))
-                return_sim_map = (return_sim_map / 255).astype(float)
+                sim_map_np = cv2.equalizeHist((sim_map_np * 255).astype(np.uint8))
+                sim_map_np = (sim_map_np / 255).astype(float)
             elif self.similarity_redistribution_method == "clahe":
                 clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-                return_sim_map = clahe.apply((sim_map_np * 255).astype(np.uint8))
-                return_sim_map = (return_sim_map / 255).astype(float)
+                sim_map_np = clahe.apply((sim_map_np * 255).astype(np.uint8))
+                sim_map_np = (sim_map_np / 255).astype(float)
             else:
                 raise NotImplementedError
-            return torch.from_numpy(return_sim_map)
+            return torch.from_numpy(sim_map_np)
