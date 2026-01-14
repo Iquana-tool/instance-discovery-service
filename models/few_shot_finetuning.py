@@ -15,7 +15,7 @@ from util.misc import get_device_from_str
 from util.postprocess import extract_masklets
 
 
-class FewShotFineTuningModel(BaseModel):
+class FewShotPatchLevelModel(BaseModel):
     def __init__(
             self,
             backbone: Encoder | None = None,

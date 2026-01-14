@@ -1,5 +1,5 @@
 from models.dbscan_predictor import DBSCANPredictor, DBScanModel
-from models.few_shot_finetuning import FewShotFineTuningModel
+from models.few_shot_finetuning import FewShotPatchLevelModel
 from models.simple_thresholding_model import Dino1000CosineHeMaxAgg
 from models.geco_model import GeCoCompletion
 from models.knn_graph_predictor import KNNGraphPredictor
@@ -16,7 +16,7 @@ def register_models(model_registry: ModelRegistry):
             description="This model embeds the image using DINOv3 and then computes a heatmap of the cosine similarity "
                         "between provided exemplar embeddings and remaining embeddings. Objects are detected by "
                         "thresholding this heatmap and extracting connected components. ",
-            tags=["Simple", "Experimental", "Not accurate"],
+            tags=["fast", "experimental", "pixel-level"],
             supports_refinement=False,
         ),
         ModelLoader(
@@ -59,18 +59,19 @@ def register_models(model_registry: ModelRegistry):
     model_registry.register_model(
         ModelInfo(
             identifier_str='fshead',
-            name="Few-Shot MLP",
+            name="Few-Shot Pixel MLP",
             description="""
             This model trains a small MLP on top of DINOv3 embeddings to reproduce the given annotations and at the same
-            time detect new objects.
+            time detect new objects. This model operates on pixel level and does not consider spatial relationships between
+            pixels.
             """,
             tags=[
-                "experimental", "few-shot"
+                "fast", "experimental", "few-shot", "pixel-level"
             ],
             supports_refinement=False,
         ),
         ModelLoader(
-            loader_function=FewShotFineTuningModel,
+            loader_function=FewShotPatchLevelModel,
         )
     )
 
