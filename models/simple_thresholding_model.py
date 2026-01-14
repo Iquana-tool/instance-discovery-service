@@ -29,15 +29,22 @@ class SimpleThresholdingModel(BaseModel):
         # Preprocess image
         if isinstance(image, np.ndarray):
             image = fromarray(image)
+
+        # Resize to a fixed size to control computational efforts as images can get large
         image = image.resize(self.max_image_size)
-        embedded_img = self.backbone.embed_image(image=image)
+
+        # Embeds the image and standardizes embeddings
+        embedded_img = self.backbone.embed_image(
+            image=image,
+            standardize=True
+        )
 
         # Combine all seed masks into a single binary mask
         combined_seed_mask = request.get_combined_seed_mask(self.max_image_size)
 
         # Process seeds separately and average similarity maps
         sim_maps = []
-        for mask in request.masks:
+        for mask in request.positive_masks:
             seed_mask = np.array(mask, dtype=np.bool)
             seed_mask = np.array(fromarray(seed_mask).resize(self.max_image_size))
             self.similarity.reset()

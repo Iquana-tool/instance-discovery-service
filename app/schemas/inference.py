@@ -14,21 +14,30 @@ class Request(BaseModel):
     model_key: str = Field(..., description="The key of the model.")
     user_id: str = Field(..., description="The user id of the model.")
     seeds: list[dict] = Field(..., description="Seeds is a list of rle encoded binary masks")
+    negative_seeds: list[dict] | None = Field(..., description="Negative seeds is a list of rle encoded binary masks")
     concept: str | None = Field(default=None,
                                 description="Optional str describing the concept of the objects to be detected.")
 
     @property
-    def masks(self) -> list[np.ndarray]:
+    def positive_masks(self) -> list[np.ndarray]:
         """ Returns an list of binary masks. Internally decodes the rle encoded masks."""
         masks = []
         for rle in self.seeds:
             masks.append(maskUtils.decode(rle))
         return masks
 
+    @property
+    def negative_masks(self):
+        """ Returns an list of binary masks. Internally decodes the rle encoded masks."""
+        masks = []
+        for rle in self.negative_seeds:
+            masks.append(maskUtils.decode(rle))
+        return masks
+
     def get_combined_seed_mask(self, size) -> np.ndarray:
         """ Returns all seed masks as one binary mask of the given size. """
         combined_seed_mask = np.zeros(tuple(size), dtype=bool)
-        for mask in self.masks:
+        for mask in self.positive_masks:
             seed_mask = np.array(mask, dtype=bool)
             seed_mask = cv2.resize(seed_mask.astype(np.uint8), size[::-1]).astype(bool)
             combined_seed_mask = np.logical_or(combined_seed_mask, seed_mask)
@@ -51,7 +60,7 @@ class Request(BaseModel):
                    resize_to: None | tuple[int, int] = None) \
             -> list[list[float]] | torch.Tensor:
         bboxes = []
-        for mask in self.masks:
+        for mask in self.positive_masks:
             seed_mask = np.array(mask, dtype=np.bool)
             if resize_to:
                 seed_mask = cv2.resize(seed_mask.astype(np.uint8), resize_to)

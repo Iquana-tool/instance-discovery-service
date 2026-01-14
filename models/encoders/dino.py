@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Literal
 
 import plotly.express as px
 import torch
@@ -141,13 +142,13 @@ class DinoModel(Encoder):
                 dim = x.shape[0]
                 return x.view(dim, -1).permute(1, 0)
 
-    def embed_image(self, image: Image.Image,
-                    recenter_embedding_vectors=True,
-                    normalize_embedding_vectors=True,
-                    apply_pca_whitening=False,
-                    standardize_features=True,
-                    keep_dim=True,
-                    debug_pca=False) -> torch.Tensor:
+    def embed_image(self,
+                    image: Image.Image,
+                    standardize: bool = True,
+                    reduced_features: int | None = None,
+                    reduce_method: Literal["pca"] = "pca",
+                    keep_dim: bool = True,
+                    debug_pca: bool = False) -> torch.Tensor:
         with torch.inference_mode():
             with torch.autocast(device_type=self.device, dtype=torch.float32):
                 # Save the original size
@@ -165,27 +166,21 @@ class DinoModel(Encoder):
                 last_hidden_state = outputs.last_hidden_state.squeeze()
                 cls_token, reg_token, embeddings = last_hidden_state[0], last_hidden_state[1:5], last_hidden_state[5:]
 
-                if recenter_embedding_vectors:
-                    # Recenter all feature vectors such that the origin is in the middle of them
-                    avg_embedding = embeddings.mean(dim=0)
-                    embeddings = embeddings - avg_embedding
-
-                if normalize_embedding_vectors:
-                    # L2 normalize each feature vector
-                    embeddings = F.normalize(embeddings, p=2, dim=1)
-
-                if standardize_features:
+                if standardize:
                     # Standardize each feature dimension to zero mean and unit variance
                     mean = embeddings.mean(dim=0, keepdim=True)
                     std = embeddings.std(dim=0, keepdim=True)
                     embeddings = (embeddings - mean) / (std + 1e-8)  # Add small epsilon to avoid division by zero
 
-                if apply_pca_whitening:
-                    # Apply PCA and whitening
-                    pca = PCA(n_components=embeddings.shape[1], whiten=True)
-                    embeddings_cpu = embeddings.cpu().numpy()
-                    embeddings_cpu = pca.fit_transform(embeddings_cpu)
-                    embeddings = torch.tensor(embeddings_cpu, device=self.device)
+                if reduced_features is not None and not reduced_features >= embeddings.shape[1]:
+                    if reduce_method == "pca":
+                        # Apply PCA and whitening
+                        pca = PCA(n_components=reduced_features, whiten=True)
+                        embeddings_cpu = embeddings.cpu().numpy()
+                        embeddings_cpu = pca.fit_transform(embeddings_cpu)
+                        embeddings = torch.tensor(embeddings_cpu, device=self.device)
+                    else:
+                        raise NotImplementedError(f"Feature reduction not implemented for method '{reduce_method}'")
 
                 embeddings = embeddings.reshape(h_patches, w_patches, -1)
                 # Resize to original size if enabled
