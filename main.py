@@ -1,7 +1,12 @@
 import logging
+from dotenv import load_dotenv
+import os
+
+# Load environment variables first
+load_dotenv()
+
 from app import create_app
 from paths import LOG_DIR
-import os
 
 
 os.makedirs(LOG_DIR, exist_ok=True)
