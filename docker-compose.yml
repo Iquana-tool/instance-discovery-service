@@ -1,0 +1,19 @@
+services:
+  coral-completion-seg:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: coral-completion-seg
+    container_name: coral-completion-seg
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./weights:/app/weights
+      - ./logs:/app/logs
+    environment:
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:8000,http://localhost:3000}
+      - PORT=${PORT:-8003}
+      - LOG_DIR=/app/logs
+      - HF_ACCESS_TOKEN=${HF_ACCESS_TOKEN}
+    restart: unless-stopped
+    command: uv run uvicorn main:app --host 0.0.0.0 --port 8003

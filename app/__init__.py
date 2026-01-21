@@ -9,7 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from huggingface_hub import login, logout, whoami
 from app.state import MODEL_CACHE, MODEL_REGISTRY
 from models.register_models import register_models
-from paths import HF_ACCESS_TOKEN
 
 # Router imports
 from app.routes import router as health_router
@@ -29,7 +28,9 @@ async def lifespan(app: FastAPI):
     # Startup code
     logger.debug("Starting up the Prompted Segmentation Service")
     logger.debug("Registering models in the MODEL_REGISTRY")
-    login(token=HF_ACCESS_TOKEN)
+    hf_token = os.getenv("HF_ACCESS_TOKEN")
+    if hf_token:
+        login(token=hf_token)
     try:
         user_info = whoami()
         print("You are logged in as:", user_info["name"])
@@ -44,7 +45,7 @@ async def lifespan(app: FastAPI):
 
 def create_app():
     logger.debug("Creating FastAPI application")
-    # Load environment variables
+    # Load environment variables FIRST before any other imports that depend on env vars
     load_dotenv()
 
     # Get allowed origins from environment variable
