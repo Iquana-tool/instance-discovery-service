@@ -13,7 +13,7 @@ session_router = APIRouter(prefix="/annotation_session", tags=["annotation_sessi
 logger = getLogger(__name__)
 
 
-@session_router.post("/open_image/user_id={user_id}")
+@session_router.post("/images/preload")
 async def open_image(user_id: str, image: UploadFile = File(...)):
     """Endpoint to upload an image and an optional previous mask.
     This is a placeholder endpoint to demonstrate file upload functionality.
@@ -28,7 +28,7 @@ async def open_image(user_id: str, image: UploadFile = File(...)):
     }
 
 
-@session_router.get("/focus_crop/min_x={min_x}&min_y={min_y}&max_x={max_x}&max_y={max_y}&user_id={user_id}")
+@session_router.get("/images/focus_crop")
 async def focus_crop(
         min_x: float,
         min_y: float,
@@ -53,7 +53,7 @@ async def focus_crop(
     }
 
 
-@session_router.get("/unfocus_crop/user_id={user_id}")
+@session_router.get("/unfocus_crop")
 async def unfocus_crop(user_id: str):
     """Revert the cached image to the original uploaded image.
     :param user_id: Unique identifier for the user to retrieve their cached image.
@@ -68,8 +68,8 @@ async def unfocus_crop(user_id: str):
     }
 
 
-@session_router.get("/close_image/user_id={user_id}")
-async def close_image(user_id: str):
+@session_router.get("/clear_cache")
+async def clear_cache_for_user(user_id: str):
     """Clear the cached image for the specified user.
     :param user_id: Unique identifier for the user to clear their cached image.
     :return: Success message or error message.
