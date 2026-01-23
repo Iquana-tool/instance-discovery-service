@@ -1,20 +1,15 @@
-from typing import Union, Literal
-
 import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from PIL import Image
-from PIL.Image import fromarray
-from schemas.contours import Contour
-from schemas.service_requests import CompletionRequest
-from torch_geometric.data import Data
-from torch_geometric.nn import knn_graph
-from torch_geometric.nn.conv import GATConv
+from typing import Union, Literal
 from tqdm import tqdm
 
-from app.schemas.inference import InstanceMasksResponse
+from schemas.contours import Contour
+from schemas.service_requests import CompletionRequest
 from models.base_models import BaseModel
 from models.encoders.dino_encoder import DinoModel, DinoModelType
 from models.encoders.encoder_base_class import Encoder
@@ -23,20 +18,46 @@ from util.misc import get_device_from_str
 from util.postprocess import extract_masklets
 
 
-class FewShotPatchLevelModel(BaseModel):
-    """ A small MLP head that trains to predict whether a pixel belongs to the same class or not. """
+class FocalLoss(nn.Module):
+    """
+    Focuses learning on hard examples by down-weighting easy background pixels.
+    """
+
+    def __init__(self, alpha=0.25, gamma=2.0):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def forward(self, logits, targets):
+        probs = torch.sigmoid(logits)
+        bce_loss = F.binary_cross_entropy_with_logits(logits, targets, reduction='none')
+        p_t = probs * targets + (1 - probs) * (1 - targets)
+        loss = bce_loss * ((1 - p_t) ** self.gamma)
+
+        if self.alpha >= 0:
+            alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
+            loss = alpha_t * loss
+        return loss.mean()
+
+
+class AttentionFewShotModel(BaseModel):
+    """
+    A robust few-shot instance discovery model using Cross-Attention,
+    Spatial Positional Encodings, and Focal Loss.
+    """
 
     def __init__(
             self,
             backbone: Encoder | None = None,
             max_image_size: Union[int, list[int]] = 512,
-            head_hidden_dim: int = 64,
-            num_epochs: int = 20,
-            lr: float = 0.001,
+            head_hidden_dim: int = 128,
+            num_epochs: int = 50,
+            lr: float = 0.0005,
             device: Literal["auto", "cpu", "cuda"] = "auto",
     ):
         super().__init__()
         self.device = get_device_from_str(device)
+
         if backbone is None:
             self.backbone = DinoModel(
                 device=self.device,
@@ -46,301 +67,155 @@ class FewShotPatchLevelModel(BaseModel):
             )
         else:
             self.backbone = backbone.to(self.device)
-        if type(max_image_size) == int:
-            self.max_image_size = [max_image_size, max_image_size]
-        else:
-            self.max_image_size = max_image_size
 
-        # Define a small MLP head for few-shot fine-tuning
-        embedding_dim = self.backbone.embedding_dim  # Assume this is available
-        self.head = nn.Sequential(
-            nn.Linear(embedding_dim, head_hidden_dim),
+        self.max_image_size = [max_image_size, max_image_size] if isinstance(max_image_size, int) else max_image_size
+        self.embedding_dim = self.backbone.embedding_dim
+
+        # --- Spatial Positional Encoding ---
+        # Maps [x, y] normalized coordinates to the feature space
+        self.pos_emb = nn.Sequential(
+            nn.Linear(2, 128),
+            nn.LayerNorm(128),
             nn.ReLU(),
-            nn.Linear(head_hidden_dim, 1),
-            nn.Sigmoid(),
+            nn.Linear(128, self.embedding_dim)
+        )
+
+        # --- Multi-Head Cross-Attention ---
+        self.attn = nn.MultiheadAttention(
+            embed_dim=self.embedding_dim,
+            num_heads=8,
+            batch_first=True
+        )
+
+        # --- Final Classifier ---
+        self.head = nn.Sequential(
+            nn.Linear(self.embedding_dim, head_hidden_dim),
+            nn.ReLU(),
+            nn.Linear(head_hidden_dim, 1)
         )
 
         self.num_epochs = num_epochs
         self.lr = lr
 
-    def _prepare_training_data(self, embedded_img, positive_masks, negative_masks):
-        # Flatten masks and embeddings
-        positive_pixels = []
-        negative_pixels = []
-        for mask in positive_masks:
-            mask = np.array(mask, dtype=np.bool)
-            mask = np.array(fromarray(mask).resize(self.max_image_size))
-            positive_pixels.append(embedded_img[mask])
-        for mask in negative_masks:
-            mask = np.array(mask, dtype=np.bool)
-            mask = np.array(fromarray(mask).resize(self.max_image_size))
-            negative_pixels.append(embedded_img[mask])
-
-        # Stack all positive and negative pixels
-        positive_pixels = torch.cat(positive_pixels, dim=0)
-        if negative_pixels:
-            negative_pixels = torch.cat(negative_pixels, dim=0)
-        else:
-            negative_pixels = torch.empty((0, embedded_img.shape[-1]), device=embedded_img.device)
-
-        # Create labels: 1 for positive, 0 for negative
-        X = torch.cat([positive_pixels, negative_pixels], dim=0)
-        y = torch.cat(
-            [
-                torch.ones(positive_pixels.shape[0], 1),
-                torch.zeros(negative_pixels.shape[0], 1),
-            ],
-            dim=0,
+    def _get_coords(self, h, w):
+        """Generates a grid of normalized [x, y] coordinates."""
+        yy, xx = torch.meshgrid(
+            torch.linspace(0, 1, h, device=self.device),
+            torch.linspace(0, 1, w, device=self.device),
+            indexing='ij'
         )
-        return X.to(self.device), y.to(self.device)
+        return torch.stack([xx, yy], dim=-1)  # [H, W, 2]
 
-    def _train_head(self, X, y):
-        # Train the head using the prepared data
-        criterion = nn.BCELoss()
-        optimizer = optim.Adam(self.head.parameters(), lr=self.lr)
+    def _get_patch_features(self, embedded_img, masks):
+        """Extracts DINO features and spatial coordinates under masks."""
+        if not masks:
+            return torch.empty((0, self.embedding_dim), device=self.device), torch.empty((0, 2), device=self.device)
 
-        # Send everything to the device
-        self.head.to(self.device)
-        criterion.to(self.device)
+        h, w, c = embedded_img.shape
+        coords_grid = self._get_coords(h, w)
 
-        # Train here
-        for epoch in range(self.num_epochs):
-            optimizer.zero_grad()
-            outputs = self.head(X)
-            loss = criterion(outputs, y)
-            loss.backward()
-            optimizer.step()
+        features, coords = [], []
+        for mask in masks:
+            mask_np = np.array(mask, dtype=np.bool_)
+            mask_resized = cv2.resize(mask_np.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST)
+            mask_bool = torch.from_numpy(mask_resized).bool().to(self.device)
 
-    def process_request(self, image, request: CompletionRequest):
-        # Preprocess image
-        if isinstance(image, np.ndarray):
-            image = fromarray(image)
-        image = image.resize(self.max_image_size)
+            features.append(embedded_img[mask_bool])
+            coords.append(coords_grid[mask_bool])
 
-        # Embed the image and standardize embeddings
-        embedded_img = self.backbone.embed_image(image=image, standardize=True)
+        return torch.cat(features), torch.cat(coords)
 
-        # Prepare training data from positive and negative masks
-        X, y = self._prepare_training_data(
-            embedded_img,
-            request.positive_exemplar_masks,
-            request.negative_exemplar_masks,
-        )
-
-        # Train the head
-        self._train_head(X, y)
-
-        # Inference: score all pixels using the trained head
-        with torch.no_grad():
-            h, w = embedded_img.shape[0], embedded_img.shape[1]
-            embedded_img_flat = embedded_img.reshape(-1, embedded_img.shape[-1])
-            scores = self.head(embedded_img_flat)
-            scores = scores.reshape(h, w).cpu().numpy()
-
-        # Convert scores to 0-255 range for thresholding
-        scores = (scores * 255).astype(np.uint8)
-
-        # Adaptive thresholding: use median of scores under positive masks
-        combined_seed_mask = cv2.resize(request.combined_exemplar_mask, self.max_image_size)
-        threshold = np.median(scores[combined_seed_mask]).item() - 1
-        _, thresholded = cv2.threshold(scores, threshold, 255, cv2.THRESH_BINARY)
-        # Extract masklets
-        masklets, scores = extract_masklets(thresholded, scores)
-
-        return [
-            Contour.from_binary_mask(masklet,
-                                     label_id=None,
-                                     added_by=request.model_registry_key)
-            for masklet in masklets
-        ]
-
-
-class SpatialFewShotPatchLevelModel(BaseModel):
-    """A model that predicts pixel class with spatial relationships using a graph attention layer."""
-    def __init__(
-            self,
-            backbone: Encoder | None = None,
-            max_image_size: Union[int, list[int]] = 512,
-            head_hidden_dim: int = 64,
-            num_epochs: int = 20,
-            lr: float = 0.001,
-            device: Literal["auto", "cpu", "cuda"] = "auto",
-    ):
-        super().__init__()
-        self.device = get_device_from_str(device)
-        if backbone is None:
-            self.backbone = DinoModel(
-                device=self.device,
-                model_type=DinoModelType.VITL16,
-                patch_size=16,
-                image_size=1024,
-            )
-        else:
-            self.backbone = backbone.to(self.device)
-        if type(max_image_size) == int:
-            self.max_image_size = [max_image_size, max_image_size]
-        else:
-            self.max_image_size = max_image_size
-
-        # Define a graph attention layer for spatial relationships
-        embedding_dim = self.backbone.embedding_dim
-        self.gat_layer = GATConv(
-            in_channels=embedding_dim,
-            out_channels=head_hidden_dim,
-            heads=4,  # Use 4 attention heads
-            concat=True,
-        )
-
-        # Define a small MLP head for few-shot fine-tuning
-        self.head = nn.Sequential(
-            nn.Linear(head_hidden_dim * 4, head_hidden_dim),
-            nn.ReLU(),
-            nn.Linear(head_hidden_dim, 1),
-            nn.Sigmoid(),
-        )
-
-        self.num_epochs = num_epochs
-        self.lr = lr
-
-    def _prepare_training_data(self, embedded_img, positive_masks, negative_masks):
-        # Flatten masks and embeddings
-        positive_pixels = []
-        negative_pixels = []
-        positive_coords = []
-        negative_coords = []
-
-        for mask in positive_masks:
-            mask = np.array(mask, dtype=np.bool)
-            mask = np.array(Image.fromarray(mask).resize(self.max_image_size))
-            positive_pixels.append(embedded_img[mask])
-            # Get spatial coordinates for positive pixels
-            yy, xx = np.where(mask)
-            positive_coords.append(torch.tensor(np.column_stack([xx, yy]), dtype=torch.float))
-
-        for mask in negative_masks:
-            mask = np.array(mask, dtype=np.bool)
-            mask = np.array(Image.fromarray(mask).resize(self.max_image_size))
-            negative_pixels.append(embedded_img[mask])
-            # Get spatial coordinates for negative pixels
-            yy, xx = np.where(mask)
-            negative_coords.append(torch.tensor(np.column_stack([xx, yy]), dtype=torch.float))
-
-        # Stack all positive and negative pixels and coordinates
-        positive_pixels = torch.cat(positive_pixels, dim=0)
-        positive_coords = torch.cat(positive_coords, dim=0) if positive_coords else torch.empty((0, 2))
-        if negative_pixels:
-            negative_pixels = torch.cat(negative_pixels, dim=0)
-            negative_coords = torch.cat(negative_coords, dim=0) if negative_coords else torch.empty((0, 2))
-        else:
-            negative_pixels = torch.empty((0, embedded_img.shape[-1]), device=embedded_img.device)
-            negative_coords = torch.empty((0, 2))
-
-        # Combine positive and negative pixels and coordinates
-        X = torch.cat([positive_pixels, negative_pixels], dim=0)
-        spatial_coords = torch.cat([positive_coords, negative_coords], dim=0)
-
-        # Create labels: 1 for positive, 0 for negative
-        y = torch.cat(
-            [
-                torch.ones(positive_pixels.shape[0], 1),
-                torch.zeros(negative_pixels.shape[0], 1),
-            ],
-            dim=0,
-        )
-        return X.to(self.device), y.to(self.device), spatial_coords.to(self.device)
-
-    def _build_spatial_graph(self, embedded_img, spatial_coords):
-        x = embedded_img  # Already flattened and filtered
-        spatial_coords = spatial_coords / 511.0  # Normalize to [0, 1]
-
-        edge_index = knn_graph(spatial_coords, k=3, batch=None, loop=True)
-
-        return Data(x=x, edge_index=edge_index)
-
-    def _train_head(self, X, y, spatial_coords):
-        criterion = nn.BCELoss()
+    def _train_head(self, features, coords, labels):
+        """Fine-tunes the attention and MLP head on the provided exemplars."""
+        criterion = FocalLoss(alpha=0.25, gamma=2.0)
         optimizer = optim.Adam(
-            list(self.gat_layer.parameters()) + list(self.head.parameters()),
-            lr=self.lr,
+            list(self.attn.parameters()) +
+            list(self.head.parameters()) +
+            list(self.pos_emb.parameters()),
+            lr=self.lr
         )
 
-        self.head.to(self.device)
-        criterion.to(device=self.device)
-        self.gat_layer.to(device=self.device)
-        # Build spatial graph
-        graph_data = self._build_spatial_graph(X, spatial_coords)
-        graph_data = graph_data.to(self.device)
-        y = y.to(self.device)
+        self.attn.train();
+        self.head.train();
+        self.pos_emb.train()
 
-        # Train
+        # Inject spatial position into semantic features
+        spatial_info = self.pos_emb(coords)
+        x_rich = (features + spatial_info).unsqueeze(0)  # [1, N_exemplars, Dim]
+
         for epoch in range(self.num_epochs):
             optimizer.zero_grad()
-            gat_out = self.gat_layer(graph_data.x, graph_data.edge_index)
-            outputs = self.head(gat_out)
-            loss = criterion(outputs, y)
+            # Self-attention allows exemplars to contextualize each other
+            attn_out, _ = self.attn(x_rich, x_rich, x_rich)
+            logits = self.head(attn_out.squeeze(0))
+            loss = criterion(logits, labels)
             loss.backward()
             optimizer.step()
 
     def process_request(self, image, request: CompletionRequest):
-        pbar = tqdm(desc="Processing request", total=5)
-        pbar.set_postfix({"step": "Embedding image"})
-        # Preprocess image
+        pbar = tqdm(desc="Processing Request", total=5)
+
+        # 1. Image Embedding
         if isinstance(image, np.ndarray):
             image = Image.fromarray(image)
         image = image.resize(self.max_image_size)
-
-        # Embed the image and standardize embeddings
         embedded_img = self.backbone.embed_image(image=image, standardize=True, keep_dim=True)
-        print(embedded_img.shape)
+        h_f, w_f, c_f = embedded_img.shape
         pbar.update(1)
-        pbar.set_postfix({"step": "Preparing training data"})
 
-        # Prepare training data from positive and negative masks
-        X, y, spatial_coords = self._prepare_training_data(
-            embedded_img,
-            request.positive_exemplar_masks,
-            request.negative_exemplar_masks
-        )
+        # 2. Data Preparation
+        pos_f, pos_c = self._get_patch_features(embedded_img, request.positive_exemplar_masks)
+        neg_f, neg_c = self._get_patch_features(embedded_img, request.negative_exemplar_masks)
+
+        X_feats = torch.cat([pos_f, neg_f])
+        X_coords = torch.cat([pos_c, neg_c])
+        y_train = torch.cat([
+            torch.ones(pos_f.size(0), 1),
+            torch.zeros(neg_f.size(0), 1)
+        ]).to(self.device)
         pbar.update(1)
-        pbar.set_postfix({"step": "Training model."})
 
-        # Train the head
-        self._train_head(X, y, spatial_coords)
-
+        # 3. Training
+        self._train_head(X_feats, X_coords, y_train)
         pbar.update(1)
-        pbar.set_postfix({"step": "Inferring similarity scores"})
-        # Inference: score all pixels using the trained head
+
+        # 4. Global Inference
+        self.attn.eval();
+        self.head.eval();
+        self.pos_emb.eval()
         with torch.no_grad():
-            h, w = embedded_img.shape[0], embedded_img.shape[1]
-            embedded_img_flat = embedded_img.reshape(-1, embedded_img.shape[-1])
+            img_coords = self._get_coords(h_f, w_f).reshape(-1, 2)
+            img_flat = embedded_img.reshape(1, -1, c_f)
 
-            # Generate spatial coordinates for ALL pixels
-            yy, xx = torch.meshgrid(torch.arange(h), torch.arange(w))
-            all_spatial_coords = torch.stack([xx.flatten(), yy.flatten()], dim=1).float().to(self.device)
-            all_spatial_coords = all_spatial_coords / 511.0  # Normalize to [0, 1]
+            # Combine Image + Position
+            query_rich = img_flat + self.pos_emb(img_coords).unsqueeze(0)
 
-            # Build graph for ALL pixels
-            inference_graph_data = self._build_spatial_graph(embedded_img_flat, all_spatial_coords)
+            # Combine Exemplars + Position
+            bank_rich = (X_feats + self.pos_emb(X_coords)).unsqueeze(0)
 
-            # Apply graph attention
-            gat_out = self.gat_layer(inference_graph_data.x, inference_graph_data.edge_index)
-
-            # Pass through MLP head
-            scores = self.head(gat_out)
-            scores = scores.reshape(h, w).cpu().numpy()
-
-        debug_show_image(scores)
-
-        # Convert scores to 0-255 range for thresholding
-        scores = (scores * 255).astype(np.uint8)
+            # Cross-Attention: Every patch compares itself to the memory bank
+            context_feats, _ = self.attn(query_rich, bank_rich, bank_rich)
+            logits = self.head(context_feats + query_rich)  # Residual link
+            scores = torch.sigmoid(logits).reshape(h_f, w_f).cpu().numpy()
 
         pbar.update(1)
-        pbar.set_postfix({"step": "Postprocessing"})
-        # Adaptive thresholding: use median of scores under positive masks
-        combined_seed_mask = cv2.resize(request.combined_exemplar_mask, self.max_image_size)
-        threshold = np.median(scores[combined_seed_mask]).item() - 1
-        _, thresholded = cv2.threshold(scores, threshold, 255, cv2.THRESH_BINARY)
-        # Extract masklets
-        masklets, scores = extract_masklets(thresholded, scores)
+
+        # 5. Post-processing
+        scores_uint8 = (scores * 255).astype(np.uint8)
+        combined_mask = cv2.resize(request.combined_exemplar_mask, (w_f, h_f), interpolation=cv2.INTER_NEAREST)
+
+        # Determine threshold based on exemplar performance
+        threshold = np.median(scores_uint8[combined_mask > 0]).item() if np.any(combined_mask) else 127
+        _, thresholded = cv2.threshold(scores_uint8, int(threshold) - 1, 255, cv2.THRESH_BINARY)
+
+        # Upscale to original request size
+        thresholded = cv2.resize(thresholded, self.max_image_size, interpolation=cv2.INTER_NEAREST)
+        scores_full = cv2.resize(scores_uint8, self.max_image_size, interpolation=cv2.INTER_LINEAR)
+
+        masklets, final_scores = extract_masklets(thresholded, scores_full)
         pbar.update(1)
-        return masklets, scores
+
+        return [
+            Contour.from_binary_mask(m, label_id=None, added_by=request.model_registry_key)
+            for m in masklets
+        ]

@@ -1,6 +1,6 @@
 from schemas.models import CompletionModel
 
-from models.few_shot_finetuning import FewShotPatchLevelModel, SpatialFewShotPatchLevelModel
+from models.few_shot_finetuning import AttentionFewShotModel
 from models.geco_model import GeCoCompletion
 from models.model_registry import ModelRegistry, ModelLoader
 from models.sam3 import SAM3Completion
@@ -67,44 +67,26 @@ def register_models(model_registry: ModelRegistry):
     )
     model_registry.register_model(
         CompletionModel(
-            registry_key='fshead',
-            name="Few-Shot Pixel MLP",
+            registry_key='fs_attention_spatial',
+            name="Few-Shot Spatial Attention Model",
             description="""
-            This model trains a small MLP on top of DINOv3 embeddings to reproduce the given annotations and at the same
-            time detect new objects. This model operates on pixel level and does not consider spatial relationships between
-            pixels.
+            A few-shot instance discovery model that utilizes a Cross-Attention mechanism 
+            with Learned Spatial Positional Encodings on top of DINO features. Unlike 
+            standard MLPs, this model considers the relative spatial layout of patches 
+            and uses a Memory Bank of exemplars to score the entire image. Optimized 
+            with Focal Loss to handle extreme class imbalance between background and objects.
             """,
             tags=[
-                "fast", "experimental", "few-shot", "pixel-level"
+                "few-shot", "spatial-aware", "attention", "dino-v2", "instance-discovery"
             ],
-            number_of_parameters=0,
+            # The head is roughly 128 (hidden) * 1024 (DINO dim) + Attention weights
+            # Usually falls under < 1.5M parameters
+            number_of_parameters=1500000,
             pretrained=True,
             finetunable=True,
-            trainable=False,
+            trainable=True,
         ),
         ModelLoader(
-            loader_function=FewShotPatchLevelModel,
+            loader_function=AttentionFewShotModel,
         )
     )
-    model_registry.register_model(
-        CompletionModel(
-            registry_key='fshead_spatial',
-            name="Few-Shot MLP with Graph Attention Network",
-            description="""
-                This model trains a small MLP on top of DINOv3 embeddings to reproduce the given annotations and at the same
-                time detect new objects. Additionally, a Graph Attention Networks captures spatial relationships between 
-                pixels.
-                """,
-            tags=[
-                "fast", "experimental", "few-shot", "spatially-aware"
-            ],
-            number_of_parameters=0,
-            pretrained=True,
-            finetunable=True,
-            trainable=False,
-        ),
-        ModelLoader(
-            loader_function=SpatialFewShotPatchLevelModel,
-        )
-    )
-
