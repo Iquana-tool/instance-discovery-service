@@ -52,6 +52,6 @@ class SAM3Completion(BaseModel):
         masks = results["masks"].cpu().numpy()
         print(masks.shape)
         scores = results["scores"].cpu().numpy()
-        return InstanceMasksResponse.from_masks(masks, scores, postprocess_request=request)
+        return masks, scores
 
 

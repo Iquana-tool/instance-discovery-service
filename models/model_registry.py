@@ -1,5 +1,5 @@
 from logging import getLogger
-
+from schemas.models import CompletionModel as ModelInfo
 
 logger = getLogger(__name__)
 
@@ -22,39 +22,6 @@ class ModelLoader:
         return self.loader_function(**self.kwargs)
 
 
-class ModelInfo:
-    def __init__(self,
-                 identifier_str: str,
-                 name: str,
-                 description: str,
-                 tags: list[str],
-                 supports_refinement: bool = False):
-        """Class to hold information about a segmentation model.
-        :param identifier_str: Identifier string. Must be unique.
-        :param name: Human readable name of the model.
-        :param description: Description of the model.
-        :param tags: List of tags for the model.
-        :param supported_prompt_types: List of supported prompt types. Default is ["point", "box"].
-        :param supports_refinement: Whether the model supports refinement with a previous mask. Default is False.
-        :raises ValueError: If the identifier string is invalid.
-        """
-        self.identifier_str = identifier_str
-        self.name = name
-        self.description = description
-        self.tags = tags
-        self.supports_refinement = supports_refinement
-
-    def to_json(self):
-        """Convert the model information to a JSON-serializable dictionary."""
-        return {
-            "identifier_str": self.identifier_str,
-            "name": self.name,
-            "description": self.description,
-            "tags": self.tags,
-            "supports_refinement": self.supports_refinement
-        }
-
-
 class ModelRegistry:
     def __init__(self):
         """Registry to hold and manage multiple models."""
@@ -69,29 +36,29 @@ class ModelRegistry:
         :param model_loader: ModelLoader object.
         :raises ValueError: If the model identifier is already registered.
         """
-        if model_info.identifier_str in self.model_infos:
-            raise ValueError(f"Model with identifier {model_info.identifier_str} is already registered.")
-        if model_info.identifier_str in self.model_loaders:
-            raise ValueError(f"Model loader with identifier {model_info.identifier_str} is already registered.")
-        self.model_infos[model_info.identifier_str] = model_info
-        self.model_loaders[model_info.identifier_str] = model_loader
-        logger.info(f"Registered model {model_info.identifier_str}. Model is loadable: {model_loader.is_loadable()}")
+        if model_info.model_registry_key in self.model_infos:
+            raise ValueError(f"Model with identifier {model_info.model_registry_key} is already registered.")
+        if model_info.model_registry_key in self.model_loaders:
+            raise ValueError(f"Model loader with identifier {model_info.model_registry_key} is already registered.")
+        self.model_infos[model_info.model_registry_key] = model_info
+        self.model_loaders[model_info.model_registry_key] = model_loader
+        logger.info(f"Registered model {model_info.model_registry_key}. Model is loadable: {model_loader.is_loadable()}")
 
-    def get_model_info(self, identifier_str: str) -> ModelInfo:
+    def get_model_info(self, model_registry_key: str) -> ModelInfo:
         """Get the model information for the given identifier."""
-        if identifier_str not in self.model_infos:
-            raise KeyError(f"Model with identifier {identifier_str} is not registered.")
-        return self.model_infos[identifier_str]
+        if model_registry_key not in self.model_infos:
+            raise KeyError(f"Model with identifier {model_registry_key} is not registered.")
+        return self.model_infos[model_registry_key]
 
-    def get_model_loader(self, identifier_str: str) -> ModelLoader:
+    def get_model_loader(self, model_registry_key: str) -> ModelLoader:
         """Get the model loader for the given identifier."""
-        if identifier_str not in self.model_loaders:
-            raise KeyError(f"Model loader with identifier {identifier_str} is not registered.")
-        return self.model_loaders[identifier_str]
+        if model_registry_key not in self.model_loaders:
+            raise KeyError(f"Model loader with identifier {model_registry_key} is not registered.")
+        return self.model_loaders[model_registry_key]
 
-    def check_model_is_loadable(self, identifier_str: str) -> bool:
+    def check_model_is_loadable(self, model_registry_key: str) -> bool:
         """Check if the model with the given identifier is loadable."""
-        model = self.get_model_loader(identifier_str)
+        model = self.get_model_loader(model_registry_key)
         return model.is_loadable()
 
     def list_models(self, only_return_available: bool = True) -> list[ModelInfo]:
@@ -104,6 +71,6 @@ class ModelRegistry:
             return [model_info for model_info, model_loader in zip(self.model_infos.values(), self.model_loaders.values()) if model_loader.is_loadable()]
         return list(self.model_infos.values())
 
-    def load_model(self, identifier_str: str):
+    def load_model(self, model_registry_key: str):
         """Load the model with the given identifier."""
-        return self.get_model_loader(identifier_str).load_model()
+        return self.get_model_loader(model_registry_key).load_model()

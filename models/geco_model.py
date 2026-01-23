@@ -2,6 +2,8 @@ import numpy as np
 import torch
 from PIL.Image import fromarray
 from geco.models.geco import GeCo
+from schemas.contours import Contour
+from schemas.service_requests import CompletionRequest
 from torchvision import ops
 from torchvision import transforms
 
@@ -39,7 +41,7 @@ class GeCoCompletion(BaseModel):
             return_masks=True)
         self.model.to(self.device)
 
-    def process_request(self, image, request: Request) -> InstanceMasksResponse | BBoxesResponse:
+    def process_request(self, image, request: CompletionRequest):
         if isinstance(image, np.ndarray):
             image = fromarray(image)
         image = image.resize((self.image_size, self.image_size))
@@ -52,11 +54,9 @@ class GeCoCompletion(BaseModel):
             image_tensor = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])(image_tensor)
             bboxes = request.get_bboxes(
                 format="x1y1x2y2",
-                return_tensors=True,
-                device=self.device,
                 relative_coordinates=True,
-                resize_to=(self.image_size, self.image_size),
-            ).unsqueeze(0)
+            )
+            bboxes = torch.tensor(bboxes, dtype=torch.float32).to(self.device)
             outputs, _, _, _ = self.model(image_tensor, bboxes)
             print("GeCo done")
             output = outputs[0]
@@ -73,4 +73,4 @@ class GeCoCompletion(BaseModel):
             print(f"NMS masks:\t", nms_masks.shape)
             masks = nms_masks.cpu().numpy()
             scores = ((output["scores"][selector])[keep]).cpu().tolist()
-        return InstanceMasksResponse.from_masks(masks, scores, postprocess_request=request)
+        return masks, scores

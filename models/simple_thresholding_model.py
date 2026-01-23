@@ -62,7 +62,7 @@ class SimpleThresholdingModel(BaseModel):
 
         masklets, scores = extract_masklets(thresholded, final_sim_map)
 
-        return InstanceMasksResponse.from_masks(masklets, scores, request)
+        return masklets, scores
 
 
 class Dino1000CosineHeMaxAgg(SimpleThresholdingModel):

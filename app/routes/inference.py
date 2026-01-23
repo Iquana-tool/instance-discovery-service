@@ -1,5 +1,6 @@
 import numpy as np
 from fastapi import status, HTTPException, Response
+from schemas.contours import Contour
 
 from app.schemas.inference import Request
 from app.state import MODEL_CACHE, IMAGE_CACHE, MODEL_REGISTRY
@@ -20,10 +21,16 @@ async def infer_instances(request: CompletionRequest):
     if not MODEL_CACHE.check_if_loaded(request.user_id, request.model_key):
         MODEL_CACHE.put(request.user_id, request.model_key, MODEL_REGISTRY.load_model(request.model_key))
     model: BaseModel = MODEL_CACHE.get(request.user_id)
-    response = model.process_request(image, request)
+    masklets, scores = model.process_request(image, request)
+    result = [
+        Contour.from_binary_mask(
+            masklet,
+            confidence=score
+        ) for masklet, score in zip(masklets, scores)
+    ]
     return {
         "success": True,
-        "message": f"Detected {len(response)} objects for user {request.user_id}",
-        "instances": response,
+        "message": f"Detected {len(result)} objects for user {request.user_id}",
+        "instances": result,
     }
 
