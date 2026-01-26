@@ -16,8 +16,10 @@ RUN apt-get update --allow-unauthenticated && \
 # Copy only the files needed for dependency installation
 COPY . .
 
-# Sync dependencies using uv with SSH mount for private repos
-RUN --mount=type=ssh uv sync --no-cache
+# Add GitHub to known_hosts and sync dependencies using uv with SSH mount for private repos
+RUN --mount=type=ssh mkdir -p ~/.ssh && \
+    ssh-keyscan github.com >> ~/.ssh/known_hosts && \
+    uv sync --no-cache
 
 # Install torch (CPU version by default, can be customized for CUDA)
 RUN uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --no-cache-dir
