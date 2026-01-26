@@ -18,10 +18,11 @@ async def infer_instances(request: CompletionRequest):
     if not request.user_id in IMAGE_CACHE:
         IMAGE_CACHE.set(request.user_id, request.image)
     image = IMAGE_CACHE.get(request.user_id)
-    if not MODEL_CACHE.check_if_loaded(request.user_id, request.model_key):
-        MODEL_CACHE.put(request.user_id, request.model_key, MODEL_REGISTRY.load_model(request.model_key))
+    if not MODEL_CACHE.check_if_loaded(request.user_id, request.model_registry_key):
+        MODEL_CACHE.put(request.user_id, request.model_registry_key, MODEL_REGISTRY.load_model(request.model_registry_key))
     model: BaseModel = MODEL_CACHE.get(request.user_id)
     masklets, scores = model.process_request(image, request)
+    print(masklets.shape)
     result = [
         Contour.from_binary_mask(
             masklet,
@@ -31,6 +32,6 @@ async def infer_instances(request: CompletionRequest):
     return {
         "success": True,
         "message": f"Detected {len(result)} objects for user {request.user_id}",
-        "instances": result,
+        "result": result,
     }
 

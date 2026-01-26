@@ -16,7 +16,7 @@ dependencies = [
     "pydantic",
     "scikit-learn",
     "scipy-stubs",
-    "tqdm~=4.67.1",
+    "tqdm",
     "transformers",
 ]
 

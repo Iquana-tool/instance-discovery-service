@@ -56,12 +56,12 @@ class GeCoCompletion(BaseModel):
                 format="x1y1x2y2",
                 relative_coordinates=True,
             )
-            bboxes = torch.tensor(bboxes, dtype=torch.float32).to(self.device)
+            bboxes = torch.tensor(bboxes, dtype=torch.float32).to(self.device).unsqueeze(0)
             outputs, _, _, _ = self.model(image_tensor, bboxes)
             print("GeCo done")
             output = outputs[0]
             print("Original number of objects:\t", output["pred_boxes"].shape)
-            selector = output['box_v'] > output['box_v'].max() / 12  # This is from the GeCo repo, im not really sure what it does
+            selector = output['box_v'] > output['box_v'].max() / 12  # This is from the GeCo repo, not really sure what it does
             print("Selected:\t", torch.sum(selector).item())
             keep = ops.nms(output['pred_boxes'][selector],
                            output['box_v'][selector],

@@ -49,7 +49,7 @@ class AttentionFewShotModel(BaseModel):
     def __init__(
             self,
             backbone: Encoder | None = None,
-            max_image_size: Union[int, list[int]] = 512,
+            max_image_size: Union[int, list[int]] = 256,
             head_hidden_dim: int = 128,
             num_epochs: int = 50,
             lr: float = 0.0005,
@@ -128,23 +128,31 @@ class AttentionFewShotModel(BaseModel):
     def _train_head(self, features, coords, labels):
         """Fine-tunes the attention and MLP head on the provided exemplars."""
         criterion = FocalLoss(alpha=0.25, gamma=2.0)
+        criterion.to(self.device)
         optimizer = optim.Adam(
             list(self.attn.parameters()) +
             list(self.head.parameters()) +
             list(self.pos_emb.parameters()),
             lr=self.lr
         )
+        # Device Preparation
+        self.attn.to(self.device)
+        self.pos_emb.to(self.device)
+        self.head.to(self.device)
+        criterion.to(self.device)
 
-        self.attn.train();
-        self.head.train();
+        self.attn.train()
+        self.head.train()
         self.pos_emb.train()
 
-        # Inject spatial position into semantic features
-        spatial_info = self.pos_emb(coords)
-        x_rich = (features + spatial_info).unsqueeze(0)  # [1, N_exemplars, Dim]
 
         for epoch in range(self.num_epochs):
             optimizer.zero_grad()
+
+            # Inject spatial position into semantic features
+            spatial_info = self.pos_emb(coords)
+            x_rich = (features + spatial_info).unsqueeze(0)  # [1, N_exemplars, Dim]
+
             # Self-attention allows exemplars to contextualize each other
             attn_out, _ = self.attn(x_rich, x_rich, x_rich)
             logits = self.head(attn_out.squeeze(0))
@@ -169,6 +177,8 @@ class AttentionFewShotModel(BaseModel):
 
         X_feats = torch.cat([pos_f, neg_f])
         X_coords = torch.cat([pos_c, neg_c])
+        X_feats.to(self.device)
+        X_coords.to(self.device)
         y_train = torch.cat([
             torch.ones(pos_f.size(0), 1),
             torch.zeros(neg_f.size(0), 1)
@@ -180,11 +190,12 @@ class AttentionFewShotModel(BaseModel):
         pbar.update(1)
 
         # 4. Global Inference
-        self.attn.eval();
-        self.head.eval();
+        self.attn.eval()
+        self.head.eval()
         self.pos_emb.eval()
         with torch.no_grad():
             img_coords = self._get_coords(h_f, w_f).reshape(-1, 2)
+            img_coords.to(self.device)
             img_flat = embedded_img.reshape(1, -1, c_f)
 
             # Combine Image + Position
@@ -215,7 +226,4 @@ class AttentionFewShotModel(BaseModel):
         masklets, final_scores = extract_masklets(thresholded, scores_full)
         pbar.update(1)
 
-        return [
-            Contour.from_binary_mask(m, label_id=None, added_by=request.model_registry_key)
-            for m in masklets
-        ]
+        return masklets, final_scores
