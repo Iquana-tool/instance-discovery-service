@@ -8,6 +8,7 @@ WORKDIR /app
 RUN apt-get update --allow-unauthenticated && \
     apt-get install -y --no-install-recommends --allow-unauthenticated \
     git \
+    openssh-client \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
