@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from transformers.models.sam3 import Sam3Model, Sam3Processor
 
-from app.schemas.inference import Request, InstanceMasksResponse
+from schemas.service_requests import CompletionRequest
 from models.base_models import BaseModel
 from util.postprocess import filter_seed_masks
 
@@ -16,21 +16,17 @@ class SAM3Completion(BaseModel):
         self.model = Sam3Model.from_pretrained("facebook/sam3").to(self.device)
         self.threshold = threshold
 
-    def process_request(self, image, request: Request) -> InstanceMasksResponse:
+    def process_request(self, image, request: CompletionRequest):
         # Extract the prompts from the given instance masks
         bboxes = request.get_bboxes(
-            format="cxcywh",
+            format="x1y1x2y2",
             relative_coordinates=False,
-            device="cpu",
-            return_tensors=False,
-            resize_to=None
         )
         bbox_labels = torch.ones(len(bboxes), dtype=torch.float32).unsqueeze(0)
-        print(image.shape)
         # Preprocess the image and prompts
         inputs = self.processor(
             images=[image],
-            text=request.concept,
+            text=request.concept.name if request.concept is not None else "visual",
             input_boxes=[bboxes],
             input_boxes_labels=bbox_labels,
             return_tensors="pt"

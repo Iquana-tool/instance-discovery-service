@@ -40,13 +40,13 @@ class SimpleThresholdingModel(BaseModel):
         )
 
         # Combine all seed masks into a single binary mask
-        combined_seed_mask = request.get_combined_seed_mask(self.max_image_size)
+        combined_seed_mask = request.combined_exemplar_mask
+        combined_seed_mask = cv2.resize(combined_seed_mask, self.max_image_size)
 
         # Process seeds separately and average similarity maps
         sim_maps = []
-        for mask in request.positive_masks:
-            seed_mask = np.array(mask, dtype=np.bool)
-            seed_mask = np.array(fromarray(seed_mask).resize(self.max_image_size))
+        for mask in request.positive_exemplar_masks:
+            seed_mask = np.array(fromarray(mask).resize(self.max_image_size)).astype(bool)
             self.similarity.reset()
             self.similarity.add_seed_instance(embedded_img[seed_mask])
             sim_map = self.similarity.get_similarity_map(embedded_img)
