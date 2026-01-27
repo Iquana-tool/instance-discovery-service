@@ -28,7 +28,7 @@ RUN cp /tmp/build_key ~/.ssh/id_rsa && \
     chmod 600 ~/.ssh/id_rsa
 
 # Sync dependencies using uv
-RUN uv sync --no-cache
+RUN uv sync
 
 # Remove SSH key after installation
 RUN rm -f ~/.ssh/id_rsa /tmp/build_key
