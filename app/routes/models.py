@@ -1,11 +1,8 @@
 from logging import getLogger
 
-from fastapi import HTTPException
-
-
-from app.state import MODEL_REGISTRY, MODEL_CACHE
 from fastapi import APIRouter
 
+from app.state import MODEL_REGISTRY, MODEL_CACHE
 
 router = APIRouter()
 session_router = APIRouter(prefix="/annotation_session", tags=["annotation_session"])
@@ -15,7 +12,7 @@ logger = getLogger(__name__)
 @router.get("/models/all")
 async def list_models():
     """ Lists all available models in the registry. """
-    available_models = MODEL_REGISTRY.list_models(only_return_available=False)
+    available_models = MODEL_REGISTRY.get_model(only_return_available=False)
     return {
         "success": True,
         "message": f"Retrieved {len(available_models)} available models.",
@@ -33,7 +30,7 @@ async def list_models():
 
 
 @router.get("/models/{model_registry_key}")
-async def list_models(model_registry_key: str):
+async def get_model(model_registry_key: str):
     """ Lists all available models in the registry. """
     available_models = MODEL_REGISTRY.get_model_info(model_registry_key)
     return {
@@ -54,16 +51,9 @@ async def load_model(model_registry_key: str, user_id: str):
             "model_id": model_registry_key
         }
     else:
-        try:
-            model = MODEL_REGISTRY.load_model(model_registry_key)
-            MODEL_CACHE.put(user_id, model_registry_key, model)
-            return {
-                "success": True,
-                "message": f"Model {model_registry_key} loaded successfully to cache.",
-            }
-        except Exception as e:
-            raise e
-            logger.error(e)
-            if type(e) == KeyError:
-                raise HTTPException(status_code=404, detail=f"Model {model_registry_key} is not registered. Please check available models.")
-            raise HTTPException(status_code=500, detail=f"Error loading model: {str(e)}")
+        model = MODEL_REGISTRY.load_model(model_registry_key)
+        MODEL_CACHE.put(user_id, model_registry_key, model)
+        return {
+            "success": True,
+            "message": f"Model {model_registry_key} loaded successfully to cache.",
+        }

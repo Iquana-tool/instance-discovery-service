@@ -7,7 +7,7 @@ from models.base_models import BaseModel
 router = APIRouter()
 session_router = APIRouter(prefix="/annotation_session", tags=["annotation_session"])
 
-@session_router.post("/completion")
+@session_router.post("/run")
 async def infer_instances(request: CompletionRequest):
     """ Infer instances from seed instances. """
     if not request.user_id in IMAGE_CACHE:
