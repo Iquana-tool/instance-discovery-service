@@ -1,4 +1,4 @@
-from schemas.models import CompletionModel
+from iquana_toolbox.schemas.models import CompletionModel
 
 from models.few_shot_finetuning import AttentionFewShotModel
 from models.geco_model import GeCoCompletion

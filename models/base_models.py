@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
-from schemas.contours import Contour
-from schemas.service_requests import CompletionRequest
+from iquana_toolbox.schemas.contours import Contour
+from iquana_toolbox.schemas.service_requests import CompletionRequest
 
 
 class BaseModel(ABC):

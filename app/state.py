@@ -1,6 +1,5 @@
 from models.model_registry import ModelRegistry
-from models.model_cache import ModelCache
-from util.image_cache import ImageCache
+from iquana_toolbox.caches import ModelCache, ImageCache
 
 
 MODEL_CACHE = ModelCache()

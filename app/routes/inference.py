@@ -1,13 +1,8 @@
-import numpy as np
-from fastapi import status, HTTPException, Response
-from schemas.contours import Contour
-
-from app.schemas.inference import Request
-from app.state import MODEL_CACHE, IMAGE_CACHE, MODEL_REGISTRY
-from models.base_models import BaseModel
-from fastapi import APIRouter
+from iquana_toolbox.schemas.contours import Contour
 from schemas.service_requests import CompletionRequest
 
+from app.state import MODEL_CACHE, IMAGE_CACHE, MODEL_REGISTRY
+from models.base_models import BaseModel
 
 router = APIRouter()
 session_router = APIRouter(prefix="/annotation_session", tags=["annotation_session"])
