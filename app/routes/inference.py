@@ -1,6 +1,6 @@
 from iquana_toolbox.schemas.contours import Contour
-from schemas.service_requests import CompletionRequest
-
+from iquana_toolbox.schemas.service_requests import CompletionRequest
+from fastapi import APIRouter
 from app.state import MODEL_CACHE, IMAGE_CACHE, MODEL_REGISTRY
 from models.base_models import BaseModel
 
