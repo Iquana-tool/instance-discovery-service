@@ -15,30 +15,20 @@ RUN apt-get update --allow-unauthenticated && \
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure git to use SSH for GitHub
-RUN mkdir -p /root/.ssh && \
-    ssh-keyscan github.com >> /root/.ssh/known_hosts && \
-    git config --global url."git@github.com:".insteadOf "https://github.com/"
+# Configure git to use token for private repo access (before copying code)
+ARG GITHUB_TOKEN
+RUN if [ -n "$GITHUB_TOKEN" ]; then \
+    cd /tmp && \
+    echo "https://${GITHUB_TOKEN}@github.com" > /root/.git-credentials && \
+    GIT_CONFIG_GLOBAL=/root/.gitconfig git config --global credential.helper store && \
+    GIT_CONFIG_GLOBAL=/root/.gitconfig git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+    fi
 
 # Copy only the files needed for dependency installation
 COPY . .
 
-# Setup SSH for private repo access
-RUN mkdir -p ~/.ssh && \
-    ssh-keyscan github.com >> ~/.ssh/known_hosts && \
-    chmod 700 ~/.ssh && \
-    chmod 644 ~/.ssh/known_hosts
-
-# Copy SSH key if it exists (for build-time git access)
-COPY build_key /tmp/build_key
-RUN cp /tmp/build_key ~/.ssh/id_rsa && \
-    chmod 600 ~/.ssh/id_rsa
-
 # Sync dependencies using uv
 RUN uv sync --no-cache
-
-# Remove SSH key after installation
-RUN rm -f ~/.ssh/id_rsa /tmp/build_key
 
 # Install torch (CPU version by default, can be customized for CUDA)
 RUN uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --no-cache-dir
