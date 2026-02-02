@@ -2,12 +2,10 @@ import numpy as np
 import torch
 from PIL.Image import fromarray
 from geco.models.geco import GeCo
-from schemas.contours import Contour
-from schemas.service_requests import CompletionRequest
+from iquana_toolbox.schemas.service_requests import CompletionRequest
 from torchvision import ops
 from torchvision import transforms
 
-from app.schemas.inference import Request, InstanceMasksResponse, BBoxesResponse
 from models.base_models import BaseModel
 
 

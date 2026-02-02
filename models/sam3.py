@@ -1,10 +1,8 @@
-import numpy as np
 import torch
+from iquana_toolbox.schemas.service_requests import CompletionRequest
 from transformers.models.sam3 import Sam3Model, Sam3Processor
 
-from schemas.service_requests import CompletionRequest
 from models.base_models import BaseModel
-from util.postprocess import filter_seed_masks
 
 
 class SAM3Completion(BaseModel):

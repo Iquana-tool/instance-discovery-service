@@ -5,6 +5,7 @@ import os
 ROOT = os.path.dirname(os.path.realpath(__file__))
 LOG_DIR = getenv("LOG_DIR", "logs")
 HF_ACCESS_TOKEN = getenv("HF_ACCESS_TOKEN")
+REDIS_URL = os.environ.get("REDIS_URL", "localhost:6739")
 
 # Weights
 WEIGHTS = os.path.join(ROOT, "weights")

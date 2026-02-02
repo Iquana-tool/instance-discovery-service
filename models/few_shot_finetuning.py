@@ -8,8 +8,8 @@ from PIL import Image
 from typing import Union, Literal
 from tqdm import tqdm
 
-from schemas.contours import Contour
-from schemas.service_requests import CompletionRequest
+from iquana_toolbox.schemas.contours import Contour
+from iquana_toolbox.schemas.service_requests import CompletionRequest
 from models.base_models import BaseModel
 from models.encoders.dino_encoder import DinoModel, DinoModelType
 from models.encoders.encoder_base_class import Encoder

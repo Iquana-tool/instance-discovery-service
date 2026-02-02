@@ -1,11 +1,10 @@
 from typing import Union
 
 import cv2
-import numpy
 import numpy as np
 import torch
-from PIL.Image import Image, fromarray
-from app.schemas.inference import BBoxesResponse, InstanceMasksResponse
+from PIL.Image import fromarray
+
 from models.base_models import BaseModel
 from models.encoders.dino_encoder import DinoModel, DinoModelType
 from models.encoders.encoder_base_class import Encoder

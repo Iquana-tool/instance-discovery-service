@@ -1,5 +1,5 @@
 from logging import getLogger
-from schemas.models import CompletionModel as ModelInfo
+from iquana_toolbox.schemas.models import CompletionModel as ModelInfo
 
 logger = getLogger(__name__)
 

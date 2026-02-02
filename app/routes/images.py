@@ -1,7 +1,7 @@
 from logging import getLogger
 
 from fastapi import APIRouter
-from schemas.service_requests import BaseImageRequest
+from iquana_toolbox.schemas.service_requests import BaseImageRequest
 
 from app.state import IMAGE_CACHE
 

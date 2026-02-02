@@ -1,18 +1,13 @@
-import numpy as np
-from fastapi import status, HTTPException, Response
-from schemas.contours import Contour
-
-from app.schemas.inference import Request
+from iquana_toolbox.schemas.contours import Contour
+from iquana_toolbox.schemas.service_requests import CompletionRequest
+from fastapi import APIRouter
 from app.state import MODEL_CACHE, IMAGE_CACHE, MODEL_REGISTRY
 from models.base_models import BaseModel
-from fastapi import APIRouter
-from schemas.service_requests import CompletionRequest
-
 
 router = APIRouter()
 session_router = APIRouter(prefix="/annotation_session", tags=["annotation_session"])
 
-@session_router.post("/completion")
+@session_router.post("/run")
 async def infer_instances(request: CompletionRequest):
     """ Infer instances from seed instances. """
     if not request.user_id in IMAGE_CACHE:
