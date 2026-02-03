@@ -57,7 +57,7 @@ async def unfocus_crop(user_id: str):
     """
     if user_id not in IMAGE_CACHE:
         return {"success": False, "message": "No image uploaded for this user. Please upload an image first."}
-    IMAGE_CACHE.set_uncropped(user_id)
+    IMAGE_CACHE.unset_focused_crop(user_id)
     return {
         "success": True,
         "message": f"Image reverted to original successfully for user {user_id}.",
