@@ -40,4 +40,4 @@ RUN mkdir -p /app/logs /app/weights
 EXPOSE 8003
 
 # Run the FastAPI app using uvicorn
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8003"]
+CMD ["uv", "run", "--upgrade", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8003"]
