@@ -213,7 +213,8 @@ class AttentionFewShotModel(BaseModel):
 
         # 5. Post-processing
         scores_uint8 = (scores * 255).astype(np.uint8)
-        combined_mask = cv2.resize(request.combined_exemplar_mask, (w_f, h_f), interpolation=cv2.INTER_NEAREST)
+        combined_mask = cv2.resize(request.combined_exemplar_mask.astype(np.uint8),
+                                   (w_f, h_f), interpolation=cv2.INTER_NEAREST)
 
         # Determine threshold based on exemplar performance
         threshold = np.median(scores_uint8[combined_mask > 0]).item() if np.any(combined_mask) else 127
