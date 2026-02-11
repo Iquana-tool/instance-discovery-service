@@ -2268,7 +2268,7 @@ wheels = [
 [[package]]
 name = "transformers"
 version = "5.2.0.dev0"
-source = { git = "https://github.com/huggingface/transformers.git#b2028e775a52bf57ac2b6bd71b49ce61fa3adde6" }
+source = { git = "https://github.com/huggingface/transformers.git#884749a1f7d84678b30e8a4ba5e402d19bed457f" }
 dependencies = [
     { name = "huggingface-hub" },
     { name = "numpy" },
