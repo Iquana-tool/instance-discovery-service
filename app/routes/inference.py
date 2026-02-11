@@ -18,12 +18,17 @@ async def infer_instances(request: CompletionRequest):
     model: BaseModel = MODEL_CACHE.get(request.user_id)
     masklets, scores = model.process_request(image, request)
     print(masklets.shape)
-    result = [
-        Contour.from_binary_mask(
-            masklet,
-            confidence=score
-        ) for masklet, score in zip(masklets, scores)
-    ]
+    result = []
+    for masklet, score in zip(masklets, scores):
+        try:
+            result.append(
+                Contour.from_binary_mask(
+                    masklet,
+                    confidence=score
+                )
+            )
+        except Exception as e:
+            print(e)
     return {
         "success": True,
         "message": f"Detected {len(result)} objects for user {request.user_id}",
