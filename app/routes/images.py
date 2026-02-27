@@ -42,7 +42,7 @@ async def focus_crop(
     """
     if user_id not in IMAGE_CACHE:
         return {"success": False, "message": "No image uploaded for this user. Please upload an image first."}
-    IMAGE_CACHE.set_focused_crop(user_id, min_x, min_y, max_x, max_y)
+    #IMAGE_CACHE.set_focused_crop(user_id, min_x, min_y, max_x, max_y)
     return {
         "success": True,
         "message": f"Image cropped successfully for user {user_id}.",

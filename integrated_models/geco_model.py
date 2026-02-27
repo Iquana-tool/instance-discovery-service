@@ -6,7 +6,7 @@ from iquana_toolbox.schemas.service_requests import CompletionRequest
 from torchvision import ops
 from torchvision import transforms
 
-from models.base_models import BaseModel
+from integrated_models.base_models import BaseModel
 
 
 class GeCoCompletion(BaseModel):

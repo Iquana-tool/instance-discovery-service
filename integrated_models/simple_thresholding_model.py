@@ -5,10 +5,10 @@ import numpy as np
 import torch
 from PIL.Image import fromarray
 
-from models.base_models import BaseModel
-from models.encoders.dino_encoder import DinoModel, DinoModelType
-from models.encoders.encoder_base_class import Encoder
-from models.similarity.cosine_similarity import CosineSimilarity
+from integrated_models.base_models import BaseModel
+from integrated_models.encoders.dino_encoder import DinoModel, DinoModelType
+from integrated_models.encoders.encoder_base_class import Encoder
+from integrated_models.similarity.cosine_similarity import CosineSimilarity
 from util.postprocess import extract_masklets
 
 

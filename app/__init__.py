@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from huggingface_hub import login, logout, whoami
 from app.state import MODEL_CACHE, MODEL_REGISTRY
-from models.register_models import register_models
+from integrated_models.register_models import register_models
 
 # Router imports
 from app.routes import router as health_router
@@ -27,7 +27,7 @@ logger.setLevel(DEBUG)
 async def lifespan(app: FastAPI):
     # Startup code
     logger.debug("Starting up the Prompted Segmentation Service")
-    logger.debug("Registering models in the MODEL_REGISTRY")
+    logger.debug("Registering integrated_models in the MODEL_REGISTRY")
     hf_token = os.getenv("HF_ACCESS_TOKEN")
     if hf_token:
         login(token=hf_token)

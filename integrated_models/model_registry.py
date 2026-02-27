@@ -7,7 +7,7 @@ logger = getLogger(__name__)
 class ModelLoader:
     def __init__(self, loader_function, **kwargs):
         """
-        Class to handle loading of models.
+        Class to handle loading of integrated_models.
         :param loader_function: Function that loads the model.
         :param kwargs: Parameters to be passed to the loader function.
         """
@@ -24,7 +24,7 @@ class ModelLoader:
 
 class ModelRegistry:
     def __init__(self):
-        """Registry to hold and manage multiple models."""
+        """Registry to hold and manage multiple integrated_models."""
         self.model_infos: dict[str, ModelInfo] = {}
         self.model_loaders: dict[str, ModelLoader] = {}
 
@@ -62,12 +62,12 @@ class ModelRegistry:
         return model.is_loadable()
 
     def list_models(self, only_return_available: bool = True) -> list[ModelInfo]:
-        """List all registered models.
-        :param only_return_available: If True, only return models that are loadable. Default is True.
+        """List all registered integrated_models.
+        :param only_return_available: If True, only return integrated_models that are loadable. Default is True.
         :return: List of ModelInfo objects.
         """
         if only_return_available:
-            # Only return loadable models
+            # Only return loadable integrated_models
             return [model_info for model_info, model_loader in zip(self.model_infos.values(), self.model_loaders.values()) if model_loader.is_loadable()]
         return list(self.model_infos.values())
 

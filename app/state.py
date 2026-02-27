@@ -1,4 +1,4 @@
-from models.model_registry import ModelRegistry
+from integrated_models.model_registry import ModelRegistry
 from iquana_toolbox.caches import ModelCache, ImageCache
 
 

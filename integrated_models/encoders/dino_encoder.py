@@ -7,7 +7,7 @@ from PIL import Image
 from sklearn.decomposition import PCA
 from transformers import AutoImageProcessor, DINOv3ViTModel, DINOv3ViTConfig, DINOv3ViTImageProcessorFast
 
-from models.encoders.encoder_base_class import Encoder
+from integrated_models.encoders.encoder_base_class import Encoder
 from util.debug import debug_show_pca_of_embedding
 from util.misc import get_device_from_str
 

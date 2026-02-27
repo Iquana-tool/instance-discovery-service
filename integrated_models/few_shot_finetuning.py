@@ -10,9 +10,9 @@ from tqdm import tqdm
 
 from iquana_toolbox.schemas.contours import Contour
 from iquana_toolbox.schemas.service_requests import CompletionRequest
-from models.base_models import BaseModel
-from models.encoders.dino_encoder import DinoModel, DinoModelType
-from models.encoders.encoder_base_class import Encoder
+from integrated_models.base_models import BaseModel
+from integrated_models.encoders.dino_encoder import DinoModel, DinoModelType
+from integrated_models.encoders.encoder_base_class import Encoder
 from util.debug import debug_show_image
 from util.misc import get_device_from_str
 from util.postprocess import extract_masklets
