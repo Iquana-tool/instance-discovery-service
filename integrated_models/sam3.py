@@ -17,7 +17,7 @@ class SAM3Completion(BaseModel):
     def process_request(self, image, request: CompletionRequest):
         # Extract the prompts from the given instance masks
         bboxes = request.get_bboxes(
-            format="x1y1x2y2",
+            format="xyxy",
             relative_coordinates=False,
         )
         bbox_labels = torch.ones(len(bboxes), dtype=torch.float32).unsqueeze(0)
