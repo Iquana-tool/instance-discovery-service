@@ -7,7 +7,7 @@ from iquana_toolbox.schemas.service_requests import CompletionRequest
 
 
 class BaseModel(ABC):
-    """ Abstract base class for 2D prompted segmentation integrated_models. """
+    """ Abstract base class for 2D prompted segmentation models. """
     def __init__(self):
         super().__init__()
         # Handle device selection automatically

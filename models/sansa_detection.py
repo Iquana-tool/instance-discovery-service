@@ -7,7 +7,7 @@ from PIL.Image import Image
 from iquana_toolbox.schemas.service_requests import CompletionRequest
 from torchvision import transforms
 
-from integrated_models.base_models import BaseModel
+from models.base_models import BaseModel
 
 
 class SANSA(BaseModel):

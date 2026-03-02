@@ -2,7 +2,7 @@ import torch
 from iquana_toolbox.schemas.service_requests import CompletionRequest
 from transformers.models.sam3 import Sam3Model, Sam3Processor
 
-from integrated_models.base_models import BaseModel
+from models.base_models import BaseModel
 
 
 class SAM3Completion(BaseModel):

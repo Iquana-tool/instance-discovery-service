@@ -1,15 +1,15 @@
 from iquana_toolbox.schemas.models import CompletionModel
 
-from integrated_models.few_shot_finetuning import AttentionFewShotModel
-from integrated_models.geco_model import GeCoCompletion
-from integrated_models.model_registry import ModelRegistry, ModelLoader
-from integrated_models.sam3 import SAM3Completion
-from integrated_models.sansa_detection import SANSA
-from integrated_models.simple_thresholding_model import Dino1000CosineHeMaxAgg
+from models.few_shot_finetuning import AttentionFewShotModel
+from models.geco_model import GeCoCompletion
+from models.model_registry import ModelRegistry, ModelLoader
+from models.sam3 import SAM3Completion
+from models.sansa_detection import SANSA
+from models.simple_thresholding_model import Dino1000CosineHeMaxAgg
 
 
 def register_models(model_registry: ModelRegistry):
-    """ This function registers all integrated_models in the MODEL_REGISTRY. You can extend it to add custom integrated_models. """
+    """ This function registers all models in the MODEL_REGISTRY. You can extend it to add custom models. """
 
     model_registry.register_model(
         CompletionModel(
