@@ -10,7 +10,6 @@ from models.simple_thresholding_model import Dino1000CosineHeMaxAgg
 
 def register_models(model_registry: ModelRegistry):
     """ This function registers all models in the MODEL_REGISTRY. You can extend it to add custom models. """
-
     model_registry.register_model(
         CompletionModel(
             registry_key="sam3",
@@ -67,5 +66,35 @@ def register_models(model_registry: ModelRegistry):
         ),
         ModelLoader(
             loader_function=GeCoCompletion,
+        )
+    )
+    model_registry.register_model(
+        CompletionModel(
+            registry_key='few-shot-attention',
+            name="Few-Shot Attention",
+            description="A few shot attention model trained on pseudolabels created with cosine similarity. ",
+            tags=["Few-Shot Attention", "Experimental"],
+            number_of_parameters=0,
+            pretrained=True,
+            finetunable=True,
+            trainable=False,
+        ),
+        ModelLoader(
+            loader_function=AttentionFewShotModel,
+        )
+    )
+    model_registry.register_model(
+        CompletionModel(
+            registry_key='thresholding',
+            name="Thresholding Model",
+            description="Thresholds cosine similarity maps of dino embeddings.",
+            tags=["Experimental"],
+            number_of_parameters=0,
+            pretrained=True,
+            finetunable=True,
+            trainable=False,
+        ),
+        ModelLoader(
+            loader_function=Dino1000CosineHeMaxAgg,
         )
     )

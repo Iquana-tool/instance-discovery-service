@@ -51,7 +51,7 @@ class GeCoCompletion(BaseModel):
             image_tensor = image_tensor.unsqueeze(0)
             image_tensor = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])(image_tensor)
             bboxes = request.get_bboxes(
-                format="x1y1x2y2",
+                format="xyxy",
                 relative_coordinates=True,
             )
             bboxes = torch.tensor(bboxes, dtype=torch.float32).to(self.device).unsqueeze(0)
