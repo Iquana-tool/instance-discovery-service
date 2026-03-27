@@ -5,9 +5,10 @@ import torch
 import torchvision.transforms.functional as TF
 from PIL import Image
 from sklearn.decomposition import PCA
-from transformers import AutoImageProcessor, DINOv3ViTModel, DINOv3ViTConfig, DINOv3ViTImageProcessorFast
+from transformers import AutoImageProcessor, DINOv3ViTModel, DINOv3ViTConfig, DINOv3ViTImageProcessor
 
 from models.encoders.encoder_base_class import Encoder
+from paths import HF_ACCESS_TOKEN
 from util.debug import debug_show_pca_of_embedding
 from util.misc import get_device_from_str
 
@@ -64,10 +65,16 @@ class DinoModel(Encoder):
         self.preprocess_mean = preprocess_mean
         self.preprocess_std = preprocess_std
 
-        self.processor: DINOv3ViTImageProcessorFast = AutoImageProcessor.from_pretrained(
+        self.processor: DINOv3ViTImageProcessor = AutoImageProcessor.from_pretrained(
             hf_url,
-            device=self.device)
-        self.config = DINOv3ViTConfig.from_pretrained(hf_url, device=self.device)
+            device=self.device,
+            token=HF_ACCESS_TOKEN
+        )
+        self.config = DINOv3ViTConfig.from_pretrained(
+            hf_url,
+            device=self.device,
+            token=HF_ACCESS_TOKEN
+        )
         if self.patch_size is not None:
             self.config.patch_size = self.patch_size
         else:
@@ -77,7 +84,7 @@ class DinoModel(Encoder):
         else:
             self.image_size = self.config.image_size
         self.model = DINOv3ViTModel(
-            config=self.config
+            config=self.config,
         )
         self.model.to(self.device)
 

@@ -2,11 +2,10 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
-from iquana_toolbox.schemas.contours import Contour
-from iquana_toolbox.schemas.service_requests import CompletionRequest
+from iquana_toolbox.schemas.networking.http.services import CompletionRequest
 
 
-class BaseModel(ABC):
+class BaseModel(torch.nn.Module, ABC):
     """ Abstract base class for 2D prompted segmentation models. """
     def __init__(self):
         super().__init__()

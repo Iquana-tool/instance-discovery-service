@@ -1,100 +1,107 @@
-from iquana_toolbox.schemas.models import CompletionModel
-
 from models.few_shot_finetuning import AttentionFewShotModel
 from models.geco_model import GeCoCompletion
-from models.model_registry import ModelRegistry, ModelLoader
 from models.sam3 import SAM3Completion
 from models.sansa_detection import SANSA
-from models.simple_thresholding_model import Dino1000CosineHeMaxAgg
+from models.watershed_dino import WatershedDINO
+import logging
+
+from iquana_toolbox.mlflow import MLFlowModelRegistry
+
+logger = logging.getLogger(__name__)
+
+MODEL_REGISTRY_CONFIG = [
+    {
+        "model_identifier": "sam3",
+        "model_factory": lambda: SAM3Completion(threshold=0.5),
+        "desc": "SAM 3 is a unified foundation model for promptable segmentation in images and videos. It supports text and visual prompts including points, boxes, and masks.",
+        "tags": {
+            "task": "instance-discovery",
+            "status": "ready",
+            "pretrained": "true",
+            "trainable": "false",
+            "finetunable": "true",
+            "domain": "general",
+            "publisher": "meta-ai",
+        }
+    },
+    {
+        "model_identifier": "sansa",
+        "model_factory": lambda : SANSA(),
+        "desc": "SANSA uses Segment Anything 2 features to provide few-shot object and part segmentation without fine-tuning SAM2 weights.",
+        "tags": {
+            "task": "few-shot-segmentation",
+            "status": "ready",
+            "pretrained": "true",
+            "trainable": "false",
+            "finetunable": "false",
+            "domain": "general",
+        }
+    },
+    {
+        "model_identifier": "geco",
+        "model_factory": lambda: GeCoCompletion(),
+        "desc": "GeCo is a low-shot counting model that performs object detection, segmentation, and count estimation in one architecture.",
+        "tags": {
+            "task": "instance-discovery",
+            "status": "ready",
+            "pretrained": "true",
+            "trainable": "false",
+            "finetunable": "true",
+            "domain": "general",
+        }
+    },
+    {
+        "model_identifier": "few-shot-attention",
+        "model_factory": lambda: AttentionFewShotModel(),
+        "desc": "Few-shot attention model trained on pseudo-labels generated with cosine similarity.",
+        "tags": {
+            "task": "instance-discovery",
+            "status": "experimental",
+            "pretrained": "true",
+            "trainable": "false",
+            "finetunable": "true",
+            "domain": "general",
+        }
+    },
+    {
+        "model_identifier": "watershed-dino",
+        "model_factory": lambda : WatershedDINO(),
+        "desc": "Computes cosine similarity between exemplars and the image, then applies watershed to extract basins.",
+        "tags": {
+            "task": "instance-discovery",
+            "status": "experimental",
+            "pretrained": "true",
+            "trainable": "false",
+            "finetunable": "true",
+            "domain": "general",
+        }
+    },
+]
 
 
-def register_models(model_registry: ModelRegistry):
-    """ This function registers all models in the MODEL_REGISTRY. You can extend it to add custom models. """
-    model_registry.register_model(
-        CompletionModel(
-            registry_key="sam3",
-            name="SAM 3",
-            description="SAM 3 is a unified foundation model for promptable segmentation in images and videos. "
-                        "It can detect, segment, and track objects using text or visual prompts such as points, boxes, "
-                        "and masks. Compared to its predecessor SAM 2, SAM 3 introduces the ability to exhaustively "
-                        "segment all instances of an open-vocabulary concept specified by a short text phrase or "
-                        "exemplars. Unlike prior work, SAM 3 can handle a vastly larger set of open-vocabulary prompts. "
-                        "It achieves 75-80% of human performance on our new SA-CO benchmark which contains 270K unique "
-                        "concepts, over 50 times more than existing benchmarks.",
-            tags=["Prompted Concept Segmentation", "General Domain", "Meta AI"],
-            number_of_parameters=0,
-            pretrained=True,
-            finetunable=True,
-            trainable=False,
-        ),
-        ModelLoader(
-            loader_function=SAM3Completion,
-            threshold=0.5,
-        )
-    )
-    model_registry.register_model(
-        CompletionModel(
-            registry_key='sansa',
-            name="SANSA",
-            description="SANSA unlocks the hidden semantics of Segment Anything 2, turning it into a powerful few-shot segmenter for both objects and parts."
-                        "🚀 No fine-tuning of SAM2 weights."
-                        "🧠 Fully promptable: points · boxes · scribbles · masks, making it ideal for real-world labeling."
-                        "📈 State-of-the-art on few-shot object & part segmentation benchmarks."
-                        "⚡ Lightweight: 3–5× faster, 4–5× smaller!",
-            tags=["Few-Shot", "AI"],
-            number_of_parameters=0,
-            pretrained=True,
-            finetunable=False,
-            trainable=False,
-        ),
-        ModelLoader(
-            loader_function=SANSA,
-        )
-    )
-    model_registry.register_model(
-        CompletionModel(
-            registry_key='geco',
-            name="GeCo",
-            description="GeCo, a low-shot counter that achieves accurate object detection, segmentation, and "
-                        "count estimation in a unified architecture. GeCo robustly generalizes the prototypes across "
-                        "objects appearances through a novel dense object query formulation.",
-            tags=["Object Detection", "AI"],
-            number_of_parameters=0,
-            pretrained=True,
-            finetunable=True,
-            trainable=False,
-        ),
-        ModelLoader(
-            loader_function=GeCoCompletion,
-        )
-    )
-    model_registry.register_model(
-        CompletionModel(
-            registry_key='few-shot-attention',
-            name="Few-Shot Attention",
-            description="A few shot attention model trained on pseudolabels created with cosine similarity. ",
-            tags=["Few-Shot Attention", "Experimental"],
-            number_of_parameters=0,
-            pretrained=True,
-            finetunable=True,
-            trainable=False,
-        ),
-        ModelLoader(
-            loader_function=AttentionFewShotModel,
-        )
-    )
-    model_registry.register_model(
-        CompletionModel(
-            registry_key='thresholding',
-            name="Thresholding Model",
-            description="Thresholds cosine similarity maps of dino embeddings.",
-            tags=["Experimental"],
-            number_of_parameters=0,
-            pretrained=True,
-            finetunable=True,
-            trainable=False,
-        ),
-        ModelLoader(
-            loader_function=Dino1000CosineHeMaxAgg,
-        )
-    )
+def register_models(model_registry: MLFlowModelRegistry):
+    """Lazily register models only if they don't already exist in MLflow.
+
+    This avoids expensive model instantiation at startup if the models are already
+    registered in the MLflow registry.
+    """
+    for config in MODEL_REGISTRY_CONFIG:
+        model_id = config["model_identifier"]
+
+        if model_registry.check_registered(model_id):
+            continue
+
+        logger.info(f"Registering model '{model_id}' (not found in registry)...")
+        try:
+            model = config["model_factory"]()
+            model_registry.register_model(
+                model_identifier=model_id,
+                model=model,
+                desc=config["desc"],
+                tags=config["tags"]
+            )
+            logger.info(f"Successfully registered model '{model_id}'.")
+        except Exception as e:
+            logger.error(f"Failed to register model '{model_id}': {e}")
+            continue
+

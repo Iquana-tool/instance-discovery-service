@@ -1,17 +1,25 @@
 import torch
-from iquana_toolbox.schemas.service_requests import CompletionRequest
+from iquana_toolbox.schemas.networking.http.services import CompletionRequest
 from transformers.models.sam3 import Sam3Model, Sam3Processor
 
 from models.base_models import BaseModel
+from paths import HF_ACCESS_TOKEN
 
 
 class SAM3Completion(BaseModel):
     def __init__(self,
                  threshold,
                  device="auto"):
+        super().__init__()
         self.device = ('cuda' if torch.cuda.is_available() else 'cpu') if device == 'auto' else device
-        self.processor = Sam3Processor.from_pretrained("facebook/sam3")
-        self.model = Sam3Model.from_pretrained("facebook/sam3").to(self.device)
+        self.processor = Sam3Processor.from_pretrained(
+            "facebook/sam3",
+            token=HF_ACCESS_TOKEN
+        )
+        self.model = Sam3Model.from_pretrained(
+            "facebook/sam3",
+            token=HF_ACCESS_TOKEN
+        ).to(self.device)
         self.threshold = threshold
 
     def process_request(self, image, request: CompletionRequest):

@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from PIL.Image import fromarray
 from geco.models.geco import GeCo
-from iquana_toolbox.schemas.service_requests import CompletionRequest
+from iquana_toolbox.schemas.networking.http.services import CompletionRequest
 from torchvision import ops
 from torchvision import transforms
 

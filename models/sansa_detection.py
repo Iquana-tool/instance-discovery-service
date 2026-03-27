@@ -3,8 +3,7 @@ from typing import Literal
 import cv2
 import numpy as np
 import torch
-from PIL.Image import Image
-from iquana_toolbox.schemas.service_requests import CompletionRequest
+from iquana_toolbox.schemas.networking.http.services import CompletionRequest
 from torchvision import transforms
 
 from models.base_models import BaseModel

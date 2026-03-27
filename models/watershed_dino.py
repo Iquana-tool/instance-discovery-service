@@ -1,22 +1,28 @@
-from typing import Union
-
 import cv2
 import numpy as np
 import torch
 from PIL.Image import fromarray
+from skimage.segmentation import watershed
 
 from models.base_models import BaseModel
 from models.encoders.dino_encoder import DinoModel, DinoModelType
-from models.encoders.encoder_base_class import Encoder
 from models.similarity.cosine_similarity import CosineSimilarity
-from util.postprocess import extract_masklets
 
 
-class SimpleThresholdingModel(BaseModel):
+class WatershedDINO(BaseModel):
     def __init__(self,
-                 similarity: CosineSimilarity,
-                 backbone: Encoder,
-                 max_image_size: Union[int, list[int]] = 512):
+                 max_image_size=1024,
+                 similarity=CosineSimilarity(
+                     device="auto",
+                     memory_aggregation="none",
+                     similarity_aggregation="mean",
+                     similarity_redistribution_method="none"),
+                 backbone=DinoModel(
+                     device="auto",
+                     model_type=DinoModelType.VITL16,
+                     patch_size=16,
+                     image_size=1024,
+                 )):
         super().__init__()
         self.similarity = similarity
         self.backbone = backbone
@@ -54,30 +60,9 @@ class SimpleThresholdingModel(BaseModel):
         final_sim_map = torch.mean(torch.stack(sim_maps), dim=0).cpu().numpy()
         final_sim_map = (final_sim_map * 255).astype(np.uint8)
 
-        # Adaptive thresholding
-        # Takes the minimum required to recreate the seed masks
-        threshold = np.median(final_sim_map[combined_seed_mask]).item()
-        print(f"Threshold: {threshold}")
-        _, thresholded = cv2.threshold(final_sim_map, threshold, 255, cv2.THRESH_BINARY)
-
-        masklets, scores = extract_masklets(thresholded, final_sim_map)
+        # Watershed Algorithm
+        masklets = watershed(~final_sim_map)
+        scores = np.ones(len(masklets))
+        print(masklets.shape)
 
         return masklets, scores
-
-
-class Dino1000CosineHeMaxAgg(SimpleThresholdingModel):
-    def __init__(self):
-        super().__init__(
-            max_image_size=512,
-            similarity=CosineSimilarity(
-                device="auto",
-                memory_aggregation="none",
-                similarity_aggregation="mean",
-                similarity_redistribution_method="he"),
-            backbone=DinoModel(
-                device="auto",
-                model_type=DinoModelType.VITL16,
-                patch_size=16,
-                image_size=1024,
-            )
-        )

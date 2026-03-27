@@ -1,3 +1,5 @@
+from typing import Union, Literal
+
 import cv2
 import numpy as np
 import torch
@@ -5,15 +7,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from PIL import Image
-from typing import Union, Literal
+from iquana_toolbox.schemas.networking.http.services import CompletionRequest
 from tqdm import tqdm
 
-from iquana_toolbox.schemas.contours import Contour
-from iquana_toolbox.schemas.service_requests import CompletionRequest
 from models.base_models import BaseModel
 from models.encoders.dino_encoder import DinoModel, DinoModelType
 from models.encoders.encoder_base_class import Encoder
-from util.debug import debug_show_image
 from util.misc import get_device_from_str
 from util.postprocess import extract_masklets
 
@@ -160,71 +159,99 @@ class AttentionFewShotModel(BaseModel):
             loss.backward()
             optimizer.step()
 
-    def process_request(self, image, request: CompletionRequest):
+    def process_request(self, image, request: "CompletionRequest"):
+        """
+        Performs few-shot inference by training a local head on exemplar features
+        and projecting the learned weights across the entire image.
+
+        Args:
+            image (np.ndarray | Image.Image): The input query image.
+            request (CompletionRequest): A dataclass containing positive/negative
+                exemplar masks and the combined mask for thresholding.
+
+        Returns:
+            tuple[list, np.ndarray]: A tuple containing:
+                - masklets: List of individual detected object masks.
+                - final_scores: The high-resolution probability heatmap.
+        """
         pbar = tqdm(desc="Processing Request", total=5)
 
-        # 1. Image Embedding
+        # --- 1. Image Embedding ---
         if isinstance(image, np.ndarray):
             image = Image.fromarray(image)
+
         image = image.resize(self.max_image_size)
+        # Extract features from the backbone (e.g., DINOv2, ResNet)
         embedded_img = self.backbone.embed_image(image=image, standardize=True, keep_dim=True)
         h_f, w_f, c_f = embedded_img.shape
         pbar.update(1)
 
-        # 2. Data Preparation
+        # --- 2. Data Preparation ---
+        # Extract feature vectors and spatial coordinates for labeled patches
         pos_f, pos_c = self._get_patch_features(embedded_img, request.positive_exemplar_masks)
         neg_f, neg_c = self._get_patch_features(embedded_img, request.negative_exemplar_masks)
 
-        X_feats = torch.cat([pos_f, neg_f])
-        X_coords = torch.cat([pos_c, neg_c])
-        X_feats.to(self.device)
-        X_coords.to(self.device)
+        # Combine features and move to GPU (Note: .to() is not in-place for Tensors)
+        X_feats = torch.cat([pos_f, neg_f]).to(self.device)
+        X_coords = torch.cat([pos_c, neg_c]).to(self.device)
+
+        # Create labels: 1 for positive exemplars, 0 for negative
         y_train = torch.cat([
             torch.ones(pos_f.size(0), 1),
             torch.zeros(neg_f.size(0), 1)
         ]).to(self.device)
         pbar.update(1)
 
-        # 3. Training
+        # --- 3. Online Training ---
+        # Fine-tune a small MLP/Linear head to distinguish exemplars from background
         self._train_head(X_feats, X_coords, y_train)
         pbar.update(1)
 
-        # 4. Global Inference
+        # --- 4. Global Inference ---
+        # Switch modules to evaluation mode
         self.attn.eval()
         self.head.eval()
         self.pos_emb.eval()
+
         with torch.no_grad():
-            img_coords = self._get_coords(h_f, w_f).reshape(-1, 2)
-            img_coords.to(self.device)
-            img_flat = embedded_img.reshape(1, -1, c_f)
+            img_coords = self._get_coords(h_f, w_f).reshape(-1, 2).to(self.device)
+            img_flat = embedded_img.reshape(1, -1, c_f).to(self.device)
 
-            # Combine Image + Position
+            # Inject positional information into query and memory bank
             query_rich = img_flat + self.pos_emb(img_coords).unsqueeze(0)
-
-            # Combine Exemplars + Position
             bank_rich = (X_feats + self.pos_emb(X_coords)).unsqueeze(0)
 
-            # Cross-Attention: Every patch compares itself to the memory bank
+            # Cross-Attention: Measure similarity between image patches and exemplars
             context_feats, _ = self.attn(query_rich, bank_rich, bank_rich)
-            logits = self.head(context_feats + query_rich)  # Residual link
+
+            # Residual connection + MLP head to get logits
+            logits = self.head(context_feats + query_rich)
             scores = torch.sigmoid(logits).reshape(h_f, w_f).cpu().numpy()
 
         pbar.update(1)
 
-        # 5. Post-processing
+        # --- 5. Post-processing & Mask Extraction ---
         scores_uint8 = (scores * 255).astype(np.uint8)
-        combined_mask = cv2.resize(request.combined_exemplar_mask.astype(np.uint8),
-                                   (w_f, h_f), interpolation=cv2.INTER_NEAREST)
 
-        # Determine threshold based on exemplar performance
-        threshold = np.median(scores_uint8[combined_mask > 0]).item() if np.any(combined_mask) else 127
+        # Scale combined mask to feature map size for dynamic thresholding
+        combined_mask_small = cv2.resize(
+            request.combined_exemplar_mask.astype(np.uint8),
+            (w_f, h_f),
+            interpolation=cv2.INTER_NEAREST
+        )
+
+        # Calculate threshold based on exemplar confidence (fallback to 127)
+        valid_mask = combined_mask_small > 0
+        threshold = np.mean(scores_uint8[valid_mask]) if np.any(valid_mask) else 127
+
         _, thresholded = cv2.threshold(scores_uint8, int(threshold) - 1, 255, cv2.THRESH_BINARY)
 
-        # Upscale to original request size
-        thresholded = cv2.resize(thresholded, self.max_image_size, interpolation=cv2.INTER_NEAREST)
+        # Upscale masks back to the required output resolution
+        final_mask = cv2.resize(thresholded, self.max_image_size, interpolation=cv2.INTER_NEAREST)
         scores_full = cv2.resize(scores_uint8, self.max_image_size, interpolation=cv2.INTER_LINEAR)
 
-        masklets, final_scores = extract_masklets(thresholded, scores_full)
+        masklets, final_scores = extract_masklets(final_mask, scores_full)
         pbar.update(1)
+        pbar.close()
 
         return masklets, final_scores
