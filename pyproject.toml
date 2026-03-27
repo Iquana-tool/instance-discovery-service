@@ -1,5 +1,5 @@
 [project]
-name = "coral-completion-seg"
+name = "iquana-instance-discovery"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
