@@ -1,7 +1,5 @@
-from models.model_registry import ModelRegistry
-from iquana_toolbox.caches import ModelCache, ImageCache
+from iquana_toolbox.mlflow import MLFlowModelRegistry
 
+from paths import MLFLOW_URL
 
-MODEL_CACHE = ModelCache()
-MODEL_REGISTRY = ModelRegistry()
-IMAGE_CACHE = ImageCache()
+MODEL_REGISTRY = MLFlowModelRegistry(MLFLOW_URL)

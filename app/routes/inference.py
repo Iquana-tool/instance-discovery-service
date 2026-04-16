@@ -1,7 +1,7 @@
-from iquana_toolbox.schemas.contours import Contour
-from iquana_toolbox.schemas.service_requests import CompletionRequest
+from iquana_toolbox.schemas.database.contours import Contour
+from iquana_toolbox.schemas.networking.http.services import CompletionRequest
 from fastapi import APIRouter
-from app.state import MODEL_CACHE, IMAGE_CACHE, MODEL_REGISTRY
+from app.state import MODEL_REGISTRY
 from models.base_models import BaseModel
 
 router = APIRouter()
@@ -10,13 +10,8 @@ session_router = APIRouter(prefix="/annotation_session", tags=["annotation_sessi
 @session_router.post("/run")
 async def infer_instances(request: CompletionRequest):
     """ Infer instances from seed instances. """
-    if not request.user_id in IMAGE_CACHE:
-        IMAGE_CACHE.set(request.user_id, request.image)
-    image = IMAGE_CACHE.get(request.user_id)
-    if not MODEL_CACHE.check_if_loaded(request.user_id, request.model_registry_key):
-        MODEL_CACHE.put(request.user_id, request.model_registry_key, MODEL_REGISTRY.load_model(request.model_registry_key))
-    model: BaseModel = MODEL_CACHE.get(request.user_id)
-    masklets, scores = model.process_request(image, request)
+    model: BaseModel = MODEL_REGISTRY.get_model_by_alias(request.model_registry_key, "latest")
+    masklets, scores = model.process_request(request.image, request)
     print(masklets.shape)
     result = []
     for masklet, score in zip(masklets, scores):

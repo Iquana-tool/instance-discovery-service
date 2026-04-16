@@ -1,12 +1,17 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
-from iquana_toolbox.schemas.contours import Contour
-from iquana_toolbox.schemas.service_requests import CompletionRequest
+import torch
+from iquana_toolbox.schemas.networking.http.services import CompletionRequest
 
 
-class BaseModel(ABC):
+class BaseModel(torch.nn.Module, ABC):
     """ Abstract base class for 2D prompted segmentation models. """
+    def __init__(self):
+        super().__init__()
+        # Handle device selection automatically
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     @abstractmethod
     def process_request(self, image, request: CompletionRequest) -> tuple[np.ndarray, np.ndarray]:
         """ Process a prompted segmentation request.
