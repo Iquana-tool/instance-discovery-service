@@ -13,6 +13,7 @@ dependencies = [
     "geco",
     "huggingface-hub>=1.3.0",
     "hydra-core>=1.3.2",
+    "iquana-service-core",
     "iquana-toolbox",
     "omegaconf>=2.3.0",
     "opencv-python",
@@ -29,4 +30,7 @@ dependencies = [
 
 [tool.uv.sources]
 geco = { git = "https://github.com/robertleist/GeCo.git" }
+iquana-service-core = { git = "https://github.com/Iquana-tool/iquana-service-core.git" }
+# For local dev before that repo is pushed, swap the line above for a path source:
+# iquana-service-core = { path = "../iquana-service-core" }
 iquana-toolbox = { git = "https://github.com/Iquana-tool/iquana-toolbox.git" }
