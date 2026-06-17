@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from PIL.Image import fromarray
 from geco.models.geco import GeCo
-from iquana_toolbox.schemas.networking.http.services import CompletionRequest
+from iquana_toolbox.schemas.networking.http.services import InstanceDiscoveryRequest
 from torchvision import ops
 from torchvision import transforms
 
@@ -39,7 +39,7 @@ class GeCoCompletion(BaseModel):
             return_masks=True)
         self.model.to(self.device)
 
-    def process_request(self, image, request: CompletionRequest):
+    def process_request(self, image, request: InstanceDiscoveryRequest):
         if isinstance(image, np.ndarray):
             image = fromarray(image)
         image = image.resize((self.image_size, self.image_size))

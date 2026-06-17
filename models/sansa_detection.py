@@ -3,7 +3,7 @@ from typing import Literal
 import cv2
 import numpy as np
 import torch
-from iquana_toolbox.schemas.networking.http.services import CompletionRequest
+from iquana_toolbox.schemas.networking.http.services import InstanceDiscoveryRequest
 from torchvision import transforms
 
 from models.base_models import BaseModel
@@ -46,7 +46,7 @@ class SANSA(BaseModel):
         prompt_dict[0][0] = {'prompt_type': prompt_type, 'prompt': prompt_d}
         return prompt_dict
 
-    def process_request(self, image, request: CompletionRequest) -> tuple[np.ndarray, np.ndarray]:
+    def process_request(self, image, request: InstanceDiscoveryRequest) -> tuple[np.ndarray, np.ndarray]:
         # Support and Query Image are the same for Intra Image Instance Discovery
         support_img = self._transform(image)
 
