@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from PIL import Image
-from iquana_toolbox.schemas.networking.http.services import InstanceDiscoveryRequest
+from iquana_toolbox.schemas.networking.http.services import InstanceSuggestionRequest
 from tqdm import tqdm
 
 from models.base_models import BaseModel
@@ -41,7 +41,7 @@ class FocalLoss(nn.Module):
 
 class AttentionFewShotModel(BaseModel):
     """
-    A robust few-shot instance discovery model using Cross-Attention,
+    A robust few-shot instance suggestion model using Cross-Attention,
     Spatial Positional Encodings, and Focal Loss.
     """
 
@@ -159,14 +159,14 @@ class AttentionFewShotModel(BaseModel):
             loss.backward()
             optimizer.step()
 
-    def process_request(self, image, request: "InstanceDiscoveryRequest"):
+    def process_request(self, image, request: "InstanceSuggestionRequest"):
         """
         Performs few-shot inference by training a local head on exemplar features
         and projecting the learned weights across the entire image.
 
         Args:
             image (np.ndarray | Image.Image): The input query image.
-            request (InstanceDiscoveryRequest): A dataclass containing positive/negative
+            request (InstanceSuggestionRequest): A dataclass containing positive/negative
                 exemplar masks and the combined mask for thresholding.
 
         Returns:

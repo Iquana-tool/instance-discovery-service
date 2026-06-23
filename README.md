@@ -1,6 +1,6 @@
-# IQUANA Instance Discovery Service
+# IQUANA Instance Suggestion Service
 
-FastAPI service for instance discovery and prompted/few-shot segmentation.
+FastAPI service for instance suggestion and prompted/few-shot segmentation.
 
 It exposes endpoints to:
 - inspect service health,
@@ -93,11 +93,11 @@ Example response fields:
 
 ### `GET /models/all`
 Lists models in registry filtered by tags:
-- `task=instance-discovery`
+- `task=instance-suggestion`
 
 ### `GET /models/all/available`
 Lists models filtered by tags:
-- `task=instance-discovery`
+- `task=instance-suggestion`
 - `status=ready`
 
 ### `GET /models/{model_registry_key}`
@@ -127,7 +127,7 @@ At startup, each model is registered only if it is not already present in MLflow
 
 - If startup logs show Hugging Face login issues, verify `HF_ACCESS_TOKEN`.
 - If model listing is empty, verify MLflow connectivity (`MLFLOW_URL`) and registration logs.
-- If `GET /models/all` does not include a model, check its tags in MLflow. This endpoint filters by `task=instance-discovery`.
+- If `GET /models/all` does not include a model, check its tags in MLflow. This endpoint filters by `task=instance-suggestion`.
 - If inference fails, ensure the requested `model_registry_key` exists and has a `latest` alias.
 
 ## Development notes

@@ -1,5 +1,5 @@
 [project]
-name = "iquana-instance-discovery"
+name = "iquana-instance-suggestion"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"

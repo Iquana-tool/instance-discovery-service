@@ -6,8 +6,8 @@ import torch
 from PIL.Image import fromarray
 from skimage.segmentation import watershed
 
-from iquana_toolbox.ai.base_classes import InstanceDiscoveryModel, InstanceDiscoveryModelInfo
-from iquana_toolbox.schemas.networking.http.services import InstanceDiscoveryRequest
+from iquana_toolbox.ai.base_classes import InstanceSuggestionModel, InstanceSuggestionModelInfo
+from iquana_toolbox.schemas.networking.http.services import InstanceSuggestionRequest
 from iquana_service_core import register_model
 
 from models.encoders.dino_encoder import DinoModel, DinoModelType
@@ -15,8 +15,8 @@ from models.similarity.cosine_similarity import CosineSimilarity
 
 
 @register_model
-class WatershedDINO(InstanceDiscoveryModel):
-    model_info = InstanceDiscoveryModelInfo(
+class WatershedDINO(InstanceSuggestionModel):
+    model_info = InstanceSuggestionModelInfo(
         registry_key="watershed-dino",
         name="Watershed DINO",
         description=(
@@ -25,7 +25,7 @@ class WatershedDINO(InstanceDiscoveryModel):
         ),
         usage_tip="Provide positive exemplar masks; experimental, works best on textured, densely packed instances.",
         tags={
-            "task": "instance-discovery",
+            "task": "instance-suggestion",
             "status": "experimental",
             "pretrained": "true",
             "finetunable": "true",
@@ -35,9 +35,17 @@ class WatershedDINO(InstanceDiscoveryModel):
         trainable=False,
     )
 
+    # Live torch backbones can't be cloudpickled; they are stripped from the pickle
+    # and rebuilt from source in ``load_context``.
+    _unpicklable_attrs = ("backbone", "similarity")
+
     def __init__(self, max_image_size=1024, similarity=None, backbone=None):
-        # Instantiate heavy backbones lazily (None defaults) so importing this module
-        # for model discovery does not load DINO weights.
+        self.max_image_size = [max_image_size, max_image_size] if isinstance(max_image_size, int) else max_image_size
+        self._load_model(similarity=similarity, backbone=backbone)
+
+    def _load_model(self, similarity=None, backbone=None):
+        """Instantiate the DINO backbone + similarity head. Reused on first init and
+        when MLflow rebuilds the model in ``load_context`` after unpickling."""
         self.similarity = similarity if similarity is not None else CosineSimilarity(
             device="auto",
             memory_aggregation="none",
@@ -50,12 +58,14 @@ class WatershedDINO(InstanceDiscoveryModel):
             patch_size=16,
             image_size=1024,
         )
-        self.max_image_size = [max_image_size, max_image_size] if isinstance(max_image_size, int) else max_image_size
+
+    def load_context(self, context):
+        self._load_model()
 
     def predict(
         self,
         context: Any,
-        model_input: list[InstanceDiscoveryRequest],
+        model_input,
         params: dict[str, Any] | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         request = model_input[0] if isinstance(model_input, list) else model_input
