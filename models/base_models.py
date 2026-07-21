@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
-from iquana_toolbox.schemas.networking.http.services import CompletionRequest
+from iquana_toolbox.schemas.networking.http.services import InstanceSuggestionRequest
 
 
 class BaseModel(torch.nn.Module, ABC):
@@ -13,7 +13,7 @@ class BaseModel(torch.nn.Module, ABC):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     @abstractmethod
-    def process_request(self, image, request: CompletionRequest) -> tuple[np.ndarray, np.ndarray]:
+    def process_request(self, image, request: InstanceSuggestionRequest) -> tuple[np.ndarray, np.ndarray]:
         """ Process a prompted segmentation request.
         :param image: The input image to be segmented.
         :param request: The request to be processed.

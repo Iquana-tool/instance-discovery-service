@@ -5,7 +5,6 @@ from iquana_service_core import create_service_app
 from app.state import MODEL_REGISTRY
 from app.routes.inference import router as inference_router
 from app.routes.inference import session_router as inference_session_router
-from models.register_models import register_models
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +24,11 @@ def _device_info() -> dict:
 
 def create_app():
     return create_service_app(
-        title="IQUANA Instance Discovery API",
-        description="FastAPI backend for instance discovery / few-shot segmentation",
-        task="instance-discovery",
+        title="IQUANA Instance Suggestion API",
+        description="FastAPI backend for instance suggestion / few-shot segmentation",
+        task="instance-suggestion",
         registry=MODEL_REGISTRY,
-        register_models=register_models,
+        models_package="models",
         inference_routers=[inference_router, inference_session_router],
         hf_login=True,
         health_extra=_device_info,

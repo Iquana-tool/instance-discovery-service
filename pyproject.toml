@@ -1,5 +1,5 @@
 [project]
-name = "iquana-instance-discovery"
+name = "iquana-instance-suggestion"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -24,13 +24,31 @@ dependencies = [
     "scikit-image>=0.26.0",
     "scikit-learn",
     "scipy-stubs",
+    "torch>=2.12.1",
+    "torchvision>=0.27.1",
     "tqdm",
-    "transformers>=5.0.0",
+    "transformers",
 ]
 
 [tool.uv.sources]
+torch = [
+  { index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+  { index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
 geco = { git = "https://github.com/robertleist/GeCo.git" }
 iquana-service-core = { git = "https://github.com/Iquana-tool/iquana-service-core.git" }
 # For local dev before that repo is pushed, swap the line above for a path source:
 # iquana-service-core = { path = "../iquana-service-core" }
 iquana-toolbox = { git = "https://github.com/Iquana-tool/iquana-toolbox.git" }
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.3.0",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
