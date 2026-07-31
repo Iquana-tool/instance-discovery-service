@@ -1,5 +1,28 @@
 # IQUANA Instance Suggestion Service
 
+> [!CAUTION]
+> **Deprecated — this service is no longer maintained or deployed.**
+>
+> It has been merged into the unified **[IQUANA AI service](https://github.com/Iquana-tool/ai-service)**,
+> which serves every AI task from one model-centric codebase. The per-task split was dropped because
+> models cross task boundaries (SAM3 does instance suggestion *and* prompted segmentation *and* more),
+> which forced the same model to be reimplemented in up to three repos.
+>
+> **Where this service's functionality lives now:** the `instance-suggestion` task surface of the
+> unified service, mounted at `http://<host>:8004/instance-suggestion`. Relative paths are unchanged,
+> so `POST /annotation_session/run` becomes `POST /instance-suggestion/annotation_session/run`. The
+> backend picks this up from a single `AI_SERVICE_URL` setting; drop any
+> `SUGGESTION_SEGMENTATION_BACKEND_URL` pin from your `.env`.
+>
+> **Not everything was ported.** Only the proven methods moved over (SAM3, plus SAM2 / Mask2Former /
+> DINOv3 on the other surfaces). The experimental `sansa`, `geco`, `few-shot-attention` and
+> `watershed-dino` entries listed below were deliberately dropped and exist only in this repo's history.
+>
+> **Do not add models or features here.** Port them to `ai-service/models/` against the capability-model
+> interface instead.
+>
+> Everything below is kept for historical reference only.
+
 FastAPI service for instance suggestion and prompted/few-shot segmentation.
 
 It exposes endpoints to:
